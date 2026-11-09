@@ -8,7 +8,8 @@ from .defaults import DEFAULT_MESSAGES
 from .provisioner import DockerProvisioner
 from .handlers.clones import add_clone_handlers
 from .message_editor.handlers import add_editor_handlers
-from .errors import error_handler\nfrom .branding import close_branded_message
+from .errors import error_handler
+from .branding import close_branded_message
 
 async def post_init(app):
     s=app.bot_data["settings"]; db=Database(s.database_url); await db.connect()
@@ -31,7 +32,8 @@ def main():
         "image_url":settings.branding_image_url,"image_path":settings.branding_image_path,"small_caps":settings.small_caps,
         "defaults":DEFAULT_MESSAGES,"allowed_users":allowed,"encryption_key":encryption_key,
         "provisioner":DockerProvisioner()})
-    app.add_handler(CallbackQueryHandler(close_branded_message, pattern=r"^branding:close$"), group=-1)\n    add_clone_handlers(app); add_editor_handlers(app); app.add_error_handler(error_handler)
+    app.add_handler(CallbackQueryHandler(close_branded_message, pattern=r"^branding:close$"), group=-1)
+    add_clone_handlers(app); add_editor_handlers(app); app.add_error_handler(error_handler)
     app.run_polling(allowed_updates=["message","callback_query"])
 
 if __name__=="__main__": main()
