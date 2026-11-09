@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from clone_manager. import branding
+from clone_manager import branding
 
 
 def test_branded_sender_always_adds_dummy_and_close_buttons(monkeypatch, tmp_path):
