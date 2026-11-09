@@ -1,0 +1,9 @@
+services:
+  clone-manager:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOST_CLONE_SECRET_DIR:-./secrets}:/var/lib/clone-manager/secrets
+    # Docker socket access is effectively host-root access. Keep this service private.
