@@ -79,3 +79,7 @@ python -m clone_manager.main
 - The manager must run on the same host as its Docker daemon and secret-file mount path. A normal Render web service does not expose a Docker socket, so clone creation cannot work there without a separate supported Docker host and a shared host path for secret mounts.
 
 The Docker socket is highly privileged. Keep this bot private, restrict administrators, protect the host and secret directory, and never log plaintext BotFather tokens.
+
+## Web-service health check and Docker requirement
+
+When the platform supplies `PORT`, the manager starts an HTTP health endpoint at `/health`. This only reports process liveness. Run `/diagnostics` in Telegram to verify PostgreSQL and Docker. The manager cannot create clones unless it can access a Docker daemon and the daemon can mount the configured `CLONE_SECRET_DIR`. Standard hosted web-service containers do not automatically provide Docker socket access.
