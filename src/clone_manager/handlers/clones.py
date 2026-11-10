@@ -111,20 +111,23 @@ async def clones(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if not _allowed(update.effective_user.id,context):
         await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ.")
         return
-    rows=await context.application.bot_data["db"].require().fetch(
-        "SELECT clone_id,product,bot_username,status,created_at FROM clone_instances WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 50",update.effective_user.id)
+    db=context.application.bot_data["db"]
+    rows=await db.require().fetch(
+        "SELECT clone_id,product,bot_username,status,created_at,container_id FROM clone_instances WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 50",
+        update.effective_user.id)
+    statuses={}
     for row in rows:
-        if row["container_id"]:
-            live=await context.application.bot_data["provisioner"].status(row["container_id"])
-            if live != row["status"]:
-                await context.application.bot_data["db"].require().execute("UPDATE clone_instances SET status=$1,updated_at=NOW() WHERE clone_id=$2",live,row["clone_id"])
-                row["status"]=live
-    running=sum(row["status"]=="running" for row in rows)
-    stopped=sum(row["status"]=="stopped" for row in rows)
-    body=f"(Quote start) ʏᴏᴜʀ ᴄʟᴏɴᴇ ᴅᴀsʜʙᴏᴀʀᴅ ♡\n\nᴛᴏᴛᴀʟ: {len(rows)} · ʀᴜɴɴɪɴɢ: {running} · sᴛᴏᴘᴘᴇᴅ: {stopped} (Quote end)"
+        live=await context.application.bot_data["provisioner"].status(row["container_id"]) if row["container_id"] else "unknown"
+        statuses[row["clone_id"]]=live
+        if live!=row["status"]:
+            await db.require().execute("UPDATE clone_instances SET status=$1,updated_at=NOW() WHERE clone_id=$2",live,row["clone_id"])
+    running=sum(status=="running" for status in statuses.values())
+    stopped=sum(status=="stopped" for status in statuses.values())
+    body=f"(Quote start) ʏᴏᴜʀ ᴄʟᴏɴᴇ ᴅᴀsʜʙᴏᴀʀᴅ ♡\\n\\nᴛᴏᴛᴀʟ: {len(rows)} · ʀᴜɴɴɪɴɢ: {running} · sᴛᴏᴘᴘᴇᴅ: {stopped} (Quote end)"
     bot_buttons=[]
     for row in rows:
-        icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
+        status=statuses[row["clone_id"]]
+        icon="🟢" if status=="running" else "🔴" if status=="stopped" else "⚪"
         bot_buttons.append(InlineKeyboardButton(f"{icon} @{row['bot_username']}",callback_data=f"clone:detail:{row['clone_id']}"))
     keyboard=[bot_buttons[i:i+2] for i in range(0,len(bot_buttons),2)]
     keyboard.append([InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")])
