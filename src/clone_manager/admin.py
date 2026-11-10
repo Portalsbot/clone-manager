@@ -246,8 +246,19 @@ async def callback_router(update,context):
         else: body="ᴜᴘᴛɪᴍᴇ ᴀɴᴅ ᴘᴇʀɪᴏᴅ sᴛᴀᴛs ʀᴇǫᴜɪʀᴇ ᴛʜᴇ ᴘʀᴏᴅᴜᴄᴛɪᴏɴ ᴍᴇᴛʀɪᴄs ᴄᴏɴɴᴇᴄᴛᴏʀ."
         await _send(context,q.message.chat_id,body)
     elif data.startswith("users:"):
-        value=await context.application.bot_data["db"].require().fetchval("SELECT COUNT(*) FROM bot_users")
-        await _send(context,q.message.chat_id,f"ᴛᴏᴛᴀʟ ʀᴇɢɪsᴛᴇʀᴇᴅ ᴜsᴇʀs: {value}")
+        action=data.split(":")[1]
+        db=context.application.bot_data["db"]
+        if action=="total":
+            value=await db.require().fetchval("SELECT COUNT(DISTINCT user_id) FROM bot_users")
+            await _send(context,q.message.chat_id,f"ᴛᴏᴛᴀʟ ʀᴇɢɪsᴛᴇʀᴇᴅ ᴜsᴇʀs: {value}")
+        elif action=="activity":
+            value=await db.require().fetchval("SELECT COUNT(DISTINCT user_id) FROM bot_users WHERE last_seen>NOW()-INTERVAL '7 days'")
+            await _send(context,q.message.chat_id,f"ᴀᴄᴛɪᴠᴇ ᴜsᴇʀs ɪɴ 7 ᴅᴀʏs: {value}")
+        elif action in {"search","info","block","unblock"}:
+            context.user_data["user_action"]=action
+            await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴜsᴇʀ ɪᴅ.")
+        else:
+            await _send(context,q.message.chat_id,"ᴜsᴇʀ ᴀᴄᴛɪᴏɴ ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ.")
     elif data.startswith("broadcast:"):
         if data=="broadcast:report": await _send(context,q.message.chat_id,"ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴘᴏʀᴛ: ɴᴏ ʀᴇᴄᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴄᴏʀᴅ.")
         else:
@@ -311,6 +322,29 @@ async def restart_callback(update,context):
     await _send(context,q.message.chat_id,"ᴀᴅᴍɪɴ sᴛᴏᴘ ᴀᴄᴛɪᴠᴀᴛᴇᴅ. ᴛʜᴇ ʙᴏᴛ ɪs ɴᴏᴡ ʀᴇsᴛʀɪᴄᴛᴇᴅ ғᴏʀ ᴀᴅᴍɪɴs ᴀɴᴅ ᴜsᴇʀs; ᴏᴡɴᴇʀ ᴀᴄᴄᴇss ʀᴇᴍᴀɪɴs.")
 async def _register_edit(update,context,command):
     await _edit_command(update,context,command)
+async def capture_user_action(update,context):
+    action=context.user_data.pop("user_action",None)
+    if not action or not update.effective_message or not update.effective_message.text: return
+    if not _is_admin(update.effective_user.id,context): return
+    try: target=int(update.effective_message.text.strip())
+    except ValueError:
+        await _send(context,update.effective_chat.id,"ɪɴᴠᴀʟɪᴅ ᴜsᴇʀ ɪᴅ. ᴜsᴇ ɴᴜᴍᴇʀɪᴄ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅ.")
+        return
+    db=context.application.bot_data["db"]
+    clone_id=context.application.bot_data["clone_id"]
+    if action in {"block","unblock"}:
+        banned=action=="block"
+        await db.require().execute("""INSERT INTO bot_users(clone_id,user_id,is_banned) VALUES($1,$2,$3)
+            ON CONFLICT(clone_id,user_id) DO UPDATE SET is_banned=EXCLUDED.is_banned""",clone_id,target,banned)
+        await _send(context,update.effective_chat.id,f"ᴜsᴇʀ {target} ʜᴀs ʙᴇᴇɴ {action}ᴇᴅ.")
+    else:
+        rows=await db.require().fetch("SELECT clone_id,first_seen,last_seen,is_banned FROM bot_users WHERE user_id=$1 ORDER BY last_seen DESC LIMIT 20",target)
+        if not rows:
+            await _send(context,update.effective_chat.id,"ɴᴏ ʀᴇᴄᴏʀᴅ ғᴏᴜɴᴅ ғᴏʀ ᴛʜɪs ᴜsᴇʀ.")
+        else:
+            body=f"ᴜsᴇʀ ɪᴅ: {target}\\n" + "\\n".join(f"{r['clone_id']} · first: {r['first_seen']} · last: {r['last_seen']} · blocked: {r['is_banned']}" for r in rows)
+            await _send(context,update.effective_chat.id,body)
+
 async def command_access_gate(update,context):
     user=update.effective_user
     if not user or not update.effective_message: return
@@ -336,5 +370,6 @@ def add_admin_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_router,pattern=r"^(admin:|maintenance:|stats:|users:|broadcast:|logs:)"))
     app.add_handler(CallbackQueryHandler(restart_callback,pattern=r"^restart:(again|stop)$"))
     app.add_handler(CallbackQueryHandler(editsetting_callback,pattern=r"^editsetting:"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, capture_user_action),group=-5)
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, capture_broadcast),group=-4)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _save_input),group=-3)
