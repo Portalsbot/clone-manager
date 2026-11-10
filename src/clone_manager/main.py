@@ -32,8 +32,7 @@ def main():
     settings=Settings.from_env()
     owner_id=settings.owner_id
     admin_ids={int(x) for x in os.getenv("ADMIN_IDS","").replace(","," ").split() if x.isdigit()}
-    allowed={int(x) for x in os.getenv("ALLOWED_USER_IDS","").replace(","," ").split() if x.isdigit()}
-    allowed.update(admin_ids); allowed.add(owner_id)
+    allowed=set(admin_ids); allowed.add(owner_id)
     encryption_key=os.environ.get("TOKEN_ENCRYPTION_KEY","").encode()
     if not encryption_key: raise RuntimeError("TOKEN_ENCRYPTION_KEY is required. Generate with scripts/generate_fernet_key.py")
     from cryptography.fernet import Fernet

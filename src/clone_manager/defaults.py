@@ -6,4 +6,10 @@ DEFAULT_MESSAGES = {
     "manager.start": "(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {usermention} ~ (Quote end)\n\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)",
     "manager.about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\n\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.",
     "manager.help": "ʜᴇʏ {mention}, ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ: @Just_astha",
+    "file.start": "ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ʏᴏᴜʀ ғɪʟᴇ sʜᴀʀɪɴɢ ʙᴏᴛ.",
+    "file.about": "ɪ ᴀᴍ ʏᴏᴜʀ ғɪʟᴇ sʜᴀʀɪɴɢ ʙᴏᴛ.",
+    "file.help": "ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ.",
+    "link.start": "ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ʏᴏᴜʀ ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛ.",
+    "link.about": "ɪ ᴀᴍ ʏᴏᴜʀ ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛ.",
+    "link.help": "ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ.",
 }

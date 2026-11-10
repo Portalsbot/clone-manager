@@ -26,14 +26,18 @@ async def send_branded(bot, chat_id: int, text: str, *, image_url: str,
     body=str(text or "")
     footer=FOOTER_MESSAGE if footer_message is None else footer_message
     if footer: body=f"{body}\n\n{footer}" if body else footer
-    requested_path=Path(image_path) if image_path else IMAGE_PATH
-    local_photo=requested_path if requested_path.is_file() else None
+    requested_path=Path(image_path) if image_path else None
+    local_photo=requested_path if requested_path and requested_path.is_file() else None
     chunks=caption_chunks(body,small_caps=small_caps,limit=900)
     command_rows=_small_caps_markup(reply_markup) if small_caps else (list(reply_markup.inline_keyboard) if reply_markup else [])
     sent=[]
     for index,caption in enumerate(chunks):
         rows=list(command_rows or []) if index==len(chunks)-1 else []
-        rows.append([InlineKeyboardButton(CLOSE_BUTTON_TEXT,callback_data=CLOSE_CALLBACK_DATA)])
+        close_button=InlineKeyboardButton(CLOSE_BUTTON_TEXT,callback_data=CLOSE_CALLBACK_DATA)
+        if rows and len(rows[-1]) < 2:
+            rows[-1].append(close_button)
+        else:
+            rows.append([close_button])
         kwargs={"chat_id":chat_id,"caption":caption,"parse_mode":"HTML","reply_markup":InlineKeyboardMarkup(rows),"disable_notification":disable_notification}
         if reply_to_message_id and index==0: kwargs["reply_to_message_id"]=reply_to_message_id
         if local_photo:

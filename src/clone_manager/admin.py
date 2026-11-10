@@ -19,7 +19,7 @@ IMAGE_DEFAULT = "https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7
 MENU_TEXT = {
     "about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\n\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.\n\n◈ ᴏᴡɴᴇʀ: {owner}\n◈ ᴅᴇᴠᴇʟᴏᴘᴇʀ: @Just_Astha\n◈ ᴅᴀᴛᴀʙᴀsᴇ: MongoDB-compatible interface / PostgreSQL storage",
     "help": "ʜᴇʏ {mention}! ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ: @Just_astha",
-    "commands": "ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs\n\n/start · /clone · /commands · /settings\n/about · /help · /broadcast · /users\n/stats · /logs · /ping · /restart\n/maintenance · /setmaintenance\n/setstart · /setabout · /sethelp\n/setimage · /setbuttons · /setfooter\n/setquote · /setname · /clones\n/stopclone · /restartclone · /cloneedit\n/cloneinfo · /texts · /edittext",
+    "commands": "(Quote start) ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs (Quote end)\n\n/clone · /commands · /settings\n/about · /help · /broadcast · /users\n/stats · /logs · /ping · /restart\n/maintenance · /setmaintenance\n/setstart · /setabout · /sethelp\n/setimage · /setbuttons · /setfooter\n/setquote · /setname · /clones\n/stopclone · /restartclone · /cloneedit\n/cloneinfo · /texts · /edittext",
     "settings": "╭───────────────⍟\n├➤ ʙᴏᴛ sᴇᴛᴛɪɴɢs\n├➤ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ʙᴏᴛ ᴘʀᴇғᴇʀᴇɴᴄᴇs ʙᴇʟᴏᴡ.\n╰───────────────⍟",
     "broadcast": "ʙʀᴏᴀᴅᴄᴀsᴛ ᴀɴᴅ ᴘʀᴏᴍᴏᴛᴇ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ {owner} sᴇɴᴘᴀɪ",
     "users": "ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴜsᴇʀs sᴇɴᴘᴀɪ",
@@ -72,9 +72,9 @@ def _markup(rows):
     for row in rows:
         keyboard.append([InlineKeyboardButton(text,callback_data=data) for text,data in row])
     return InlineKeyboardMarkup(keyboard)
-def _edit_markup(prefix):
+def _edit_markup(prefix, edit_label="· ᴇᴅɪᴛ ᴛᴇxᴛ ·"):
     return _markup([
-        [("· ᴘʀᴇᴠɪᴇᴡ ·",f"{prefix}:preview"),("· ᴇᴅɪᴛ ·",f"{prefix}:edit")],
+        [("· ᴘʀᴇᴠɪᴇᴡ ·",f"{prefix}:preview"),(edit_label,f"{prefix}:edit")],
         [("· sᴀᴠᴇ ·",f"{prefix}:save"),("· ᴄᴀɴᴄᴇʟ ·",f"{prefix}:cancel")],
     ])
 async def _owner_admin(update, context):
@@ -174,7 +174,7 @@ async def _edit_command(update,context,command):
     }
     current=await context.application.bot_data["db"].get_setting(key,defaults.get(key,MENU_TEXT.get(command,"")))
     context.user_data["pending_setting"]={"key":key,"value":current,"command":command}
-    await _send(context,update.effective_chat.id,MENU_TEXT[command],_edit_markup("editsetting"))
+    await _send(context,update.effective_chat.id,MENU_TEXT[command],_edit_markup("editsetting", {"setimage":"· ᴄʜᴀɴɢᴇ ɪᴍᴀɢᴇ ·","setfooter":"· ᴇᴅɪᴛ ғᴏᴏᴛᴇʀ ·","setname":"· ᴇᴅɪᴛ ɴᴀᴍᴇ ·","setquote":"· ᴇᴅɪᴛ ǫᴜᴏᴛᴇ ·","setbuttons":"· ᴇᴅɪᴛ ʙᴜᴛᴛᴏɴs ·"}.get(command, "· ᴇᴅɪᴛ ᴛᴇxᴛ ·")))
 async def _save_input(update,context):
     pending=context.user_data.get("pending_setting")
     if not pending or not update.effective_message or not update.effective_message.text: return
@@ -186,7 +186,7 @@ async def _save_input(update,context):
             await _send(context,update.effective_chat.id,"ɪɴᴠᴀʟɪᴅ ɪᴍᴀɢᴇ ᴜʀʟ. ᴏʟᴅ ɪᴍᴀɢᴇ ʀᴇᴍᴀɪɴs ᴜɴᴄʜᴀɴɢᴇᴅ.")
             return
     pending["draft"]=value
-    await _send(context,update.effective_chat.id,"ᴅʀᴀғᴛ ʀᴇᴄᴇɪᴠᴇᴅ. ᴘʀᴇᴠɪᴇᴡ ɪᴛ ᴏʀ sᴀᴠᴇ ᴛᴏ ᴀᴘᴘʟʏ.",_edit_markup("editsetting"))
+    await _send(context,update.effective_chat.id,"ᴅʀᴀғᴛ ʀᴇᴄᴇɪᴠᴇᴅ. ᴘʀᴇᴠɪᴇᴡ ɪᴛ ᴏʀ sᴀᴠᴇ ᴛᴏ ᴀᴘᴘʟʏ.",_edit_markup("editsetting", {"setimage":"· ᴄʜᴀɴɢᴇ ɪᴍᴀɢᴇ ·","setfooter":"· ᴇᴅɪᴛ ғᴏᴏᴛᴇʀ ·","setname":"· ᴇᴅɪᴛ ɴᴀᴍᴇ ·","setquote":"· ᴇᴅɪᴛ ǫᴜᴏᴛᴇ ·","setbuttons":"· ᴇᴅɪᴛ ʙᴜᴛᴛᴏɴs ·"}.get(pending.get("command"), "· ᴇᴅɪᴛ ᴛᴇxᴛ ·")))
 async def editsetting_callback(update,context):
     q=update.callback_query; await q.answer()
     pending=context.user_data.get("pending_setting")
@@ -242,7 +242,9 @@ async def editsetting_callback(update,context):
         if pending["key"]=="branding.quote_enabled" and value.lower() not in {"on","off","true","false"}:
             await q.answer("Use on or off.",show_alert=True); return
         await context.application.bot_data["db"].set_setting(pending["key"],value)
-        if pending["key"]=="branding.image_url": context.application.bot_data["image_url"]=value
+        if pending["key"]=="branding.image_url":
+            context.application.bot_data["image_url"]=value
+            context.application.bot_data["image_path"]=None
         if pending["key"]=="branding.quote_enabled":
             from .formatting import set_quote_enabled
             set_quote_enabled(value.lower() in {"on","true"})

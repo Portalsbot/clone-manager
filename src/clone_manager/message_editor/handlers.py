@@ -48,7 +48,7 @@ async def edittext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
         return
     if not context.args:
-        msg = "Usage: `/edittext TEMPLATE_KEY`"
+        return await texts(update, context)
     else:
         key = context.args[0]
         if key not in context.application.bot_data["defaults"]:
