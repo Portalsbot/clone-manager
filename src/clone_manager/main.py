@@ -74,8 +74,12 @@ async def post_init(app):
     ]
     await app.bot.set_my_commands(public_commands)
     for user_id in {app.bot_data["owner_id"], *app.bot_data["admins"]}:
-        await app.bot.set_my_commands(public_commands + admin_commands,
-            scope=BotCommandScopeChat(chat_id=user_id))
+        try:
+            await app.bot.set_my_commands(public_commands + admin_commands,
+                scope=BotCommandScopeChat(chat_id=user_id))
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Could not set admin command menu for user %s: %s", user_id, type(exc).__name__)
     if not await db.get_setting("branding.footer",""):
         await db.set_setting("branding.footer",'(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)')
     app.bot_data["image_url"]=await db.get_setting("branding.image_url",app.bot_data["image_url"])
