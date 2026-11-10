@@ -327,6 +327,14 @@ async def scheduled_broadcast_worker(context) -> None:
                     status, sent, failed, row["id"],
                 )
                 await _log_broadcast(db, row["created_by"], f"scheduled id={row['id']}, status={status}, sent={sent}, failed={failed}", "info" if not failed else "warning")
+                try:
+                    await _send(
+                        context, row["created_by"],
+                        f"sᴄʜᴇᴅᴜʟᴇᴅ ʙʀᴏᴀᴅᴄᴀsᴛ #{row['id']} {status}. sᴇɴᴛ: {sent} · ғᴀɪʟᴇᴅ: {failed}.",
+                        _markup([[("· ᴠɪᴇᴡ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴘᴏʀᴛ ·", "broadcast:report")]]),
+                    )
+                except Exception as notify_error:
+                    log.warning("Could not notify broadcast creator (%s)", type(notify_error).__name__)
             except Exception as exc:
                 log.exception("Scheduled broadcast %s failed", row["id"])
                 await db.require().execute("UPDATE scheduled_broadcasts SET status='failed',last_error=$1,finished_at=NOW() WHERE id=$2", type(exc).__name__, row["id"])

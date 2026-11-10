@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 from pathlib import Path
-from telegram.ext import ApplicationBuilder, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CallbackQueryHandler, MessageHandler, filters
 from .config import Settings
 from .database import Database
 from .defaults import DEFAULT_MESSAGES
@@ -18,8 +18,22 @@ async def post_init(app):
     await db.connect()
     for migration in sorted(Path("migrations").glob("*.sql")):
         await db.init_schema(migration.read_text(encoding="utf-8"))
-    # Scheduled sends interrupted by a process restart are safely retried.
-    await db.require().execute("UPDATE scheduled_broadcasts SET status='pending' WHERE status='sending'")
+    # If a process stops mid-delivery, recipient-level outcomes are unknown.
+    # Mark that job failed rather than replaying it and duplicating some recipients.
+    interrupted = await db.require().fetch("""
+        UPDATE scheduled_broadcasts
+        SET status='failed',
+            last_error=COALESCE(last_error,'Process restarted during delivery; recipient-level outcome is unknown.'),
+            finished_at=COALESCE(finished_at,NOW())
+        WHERE status='sending'
+        RETURNING id,created_by
+    """)
+    for item in interrupted:
+        await db.require().execute(
+            "INSERT INTO manager_activity(actor_id,action,details,level) VALUES($1,'broadcast',$2,'error')",
+            item["created_by"],
+            f"scheduled id={item['id']} failed after restart; delivery outcome is unknown",
+        )
     app.bot_data["db"]=db
     if not await db.get_setting("branding.footer",""):
         await db.set_setting("branding.footer",'(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)')
@@ -32,6 +46,31 @@ async def post_init(app):
         raise RuntimeError("PTB JobQueue is unavailable; install the project dependencies.")
     from .broadcasts import scheduled_broadcast_worker
     app.job_queue.run_repeating(scheduled_broadcast_worker, interval=15, first=5, name="scheduled-broadcasts")
+
+async def callback_access_gate(update, context):
+    query = update.callback_query
+    if query is None or query.data == "branding:close":
+        return
+    if query.from_user.id == context.application.bot_data["owner_id"]:
+        return
+    if await context.application.bot_data["db"].get_setting("system.maintenance", "false") == "true":
+        await query.answer("Maintenance mode is enabled.", show_alert=True)
+        raise ApplicationHandlerStop
+
+
+async def message_access_gate(update, context):
+    user = update.effective_user
+    if user is None or user.id == context.application.bot_data["owner_id"]:
+        return
+    if await context.application.bot_data["db"].get_setting("system.maintenance", "false") == "true":
+        for state in (
+            "pending_setting", "pending_text_editor", "awaiting_text_draft", "user_action",
+            "pending_clone_edit", "pending_clone_product", "editing_text_key", "editing_clone_id",
+            "broadcast_mode", "pending_broadcast", "awaiting_broadcast_time",
+        ):
+            context.user_data.pop(state, None)
+        raise ApplicationHandlerStop
+
 
 async def post_shutdown(app):
     db=app.bot_data.get("db")
@@ -52,7 +91,9 @@ def main():
         "small_caps":settings.small_caps,"defaults":DEFAULT_MESSAGES,"allowed_users":allowed,
         "encryption_key":encryption_key,"provisioner":DockerProvisioner()})
     app.add_handler(CallbackQueryHandler(close_branded_message,pattern=r"^branding:close$"),group=-10)
+    app.add_handler(CallbackQueryHandler(callback_access_gate), group=-9)
     app.add_handler(MessageHandler(filters.COMMAND, command_access_gate), group=-100)
+    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, message_access_gate), group=-90)
     add_clone_handlers(app)
     add_editor_handlers(app)
     add_admin_handlers(app)

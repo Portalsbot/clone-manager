@@ -22,8 +22,11 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
     db=context.application.bot_data["db"]
     clone_id=context.application.bot_data["clone_id"]
     user_id=update.effective_user.id
+    globally_blocked=await db.require().fetchval(
+        "SELECT EXISTS(SELECT 1 FROM bot_user_blocks WHERE user_id=$1)", user_id
+    )
     existing=await db.require().fetchrow("SELECT is_banned FROM bot_users WHERE clone_id=$1 AND user_id=$2",clone_id,user_id)
-    if existing and existing["is_banned"]:
+    if globally_blocked or (existing and existing["is_banned"]):
         await _send(update,context,"ʏᴏᴜ ᴄᴀɴɴᴏᴛ ᴜsᴇ ᴛʜɪs ʙᴏᴛ. ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ.")
         return
     await db.require().execute("""INSERT INTO bot_users(clone_id,user_id) VALUES($1,$2)
@@ -127,7 +130,10 @@ async def _live_clone_rows(context, filter_key="all"):
         context.application.bot_data["owner_id"])
     live_rows=[]
     for row in rows:
-        status=await context.application.bot_data["provisioner"].status(row["container_id"]) if row["container_id"] else "unknown"
+        if row["container_id"]:
+            status=await context.application.bot_data["provisioner"].status(row["container_id"])
+        else:
+            status=row["status"] if row["status"] in {"failed","provisioning"} else "unknown"
         if status!=row["status"]:
             await db.require().execute("UPDATE clone_instances SET status=$1,updated_at=NOW() WHERE clone_id=$2",status,row["clone_id"])
         item=dict(row)
@@ -210,11 +216,17 @@ async def clone_manage_callback(update,context):
     if not row:
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
     if action in {"stop","restart"}:
+        if not row["container_id"]:
+            await _send(update,context,"ᴛʜɪs ᴄʟᴏɴᴇ ʜᴀs ɴᴏ ᴀᴄᴛɪᴠᴇ ᴄᴏɴᴛᴀɪɴᴇʀ.")
+            return
         verb="sᴛᴏᴘ" if action=="stop" else "ʀᴇsᴛᴀʀᴛ"
         markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"· ʏᴇs, {verb} ·",callback_data=f"clone:confirm-{action}:{clone_id}"),InlineKeyboardButton("· ᴄᴀɴᴄᴇʟ ·",callback_data="admin:back")]])
         await _send(update,context,f"(Quote start) ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ {verb} @{row['bot_username']}? (Quote end)",markup)
         return
     if action.startswith("confirm-"):
+        if not row["container_id"]:
+            await _send(update,context,"ᴛʜɪs ᴄʟᴏɴᴇ ʜᴀs ɴᴏ ᴀᴄᴛɪᴠᴇ ᴄᴏɴᴛᴀɪɴᴇʀ.")
+            return
         operation=action.split("-",1)[1]
         if operation=="stop":
             await context.application.bot_data["provisioner"].stop(row["container_id"]); status="stopped"
@@ -242,6 +254,7 @@ async def stopclone(update:Update,context:ContextTypes.DEFAULT_TYPE):
     else:
         row=await context.application.bot_data["db"].require().fetchrow("SELECT owner_id,container_id FROM clone_instances WHERE clone_id=$1",context.args[0])
         if not row or row["owner_id"]!=context.application.bot_data["owner_id"]: body="Clone not found or not owned by you."
+        elif not row["container_id"]: body="This clone has no active container."
         else:
             await context.application.bot_data["provisioner"].stop(row["container_id"])
             await context.application.bot_data["db"].require().execute("UPDATE clone_instances SET status='stopped',updated_at=NOW() WHERE clone_id=$1",context.args[0]); body="Clone stopped."
@@ -253,6 +266,7 @@ async def restartclone(update:Update,context:ContextTypes.DEFAULT_TYPE):
     else:
         row=await context.application.bot_data["db"].require().fetchrow("SELECT owner_id,container_id FROM clone_instances WHERE clone_id=$1",context.args[0])
         if not row or row["owner_id"]!=context.application.bot_data["owner_id"]: body="Clone not found or not owned by you."
+        elif not row["container_id"]: body="This clone has no active container."
         else:
             await context.application.bot_data["provisioner"].restart(row["container_id"])
             await context.application.bot_data["db"].require().execute("UPDATE clone_instances SET status='running',updated_at=NOW() WHERE clone_id=$1",context.args[0]); body="Clone restarted."

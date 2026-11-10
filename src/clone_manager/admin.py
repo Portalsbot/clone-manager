@@ -314,7 +314,7 @@ async def callback_router(update,context):
         elif action=="health":
             try:
                 context.application.bot_data["db"].require()
-                context.application.bot_data["provisioner"].client.ping()
+                await asyncio.to_thread(context.application.bot_data["provisioner"].client.ping)
                 body="ᴅᴀᴛᴀʙᴀsᴇ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\\nᴅᴏᴄᴋᴇʀ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\\nᴍᴀɴᴀɢᴇʀ: ᴏɴʟɪɴᴇ"
             except Exception:
                 body="ᴅᴀᴛᴀʙᴀsᴇ / ᴅᴏᴄᴋᴇʀ ᴄᴏɴɴᴇᴄᴛɪᴏɴ ᴘʀᴏʙʟᴇᴍ."
