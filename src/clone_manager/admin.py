@@ -186,7 +186,9 @@ async def editsetting_callback(update,context):
         value=pending.get("draft",pending["value"])
         if pending["key"]=="branding.image_url":
             try:
-                await context.bot.send_photo(q.message.chat_id,photo=value,caption="ɪᴍᴀɢᴇ ᴘʀᴇᴠɪᴇᴡ")
+                await send_branded(context.bot,q.message.chat_id,"ɪᴍᴀɢᴇ ᴘʀᴇᴠɪᴇᴡ",
+                    image_url=value,image_path=None,small_caps=True,
+                    footer_message=await context.application.bot_data["db"].get_setting("branding.footer",FOOTER_DEFAULT))
                 pending["previewed"]=True
             except Exception:
                 pending["previewed"]=False
