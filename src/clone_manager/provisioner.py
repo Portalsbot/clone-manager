@@ -41,7 +41,13 @@ class DockerProvisioner:
         folder.mkdir(parents=True,exist_ok=True,mode=0o700); os.chmod(folder,0o700)
         config={"BOT_TOKEN":bot_token,"DATABASE_URL":self.database_url,"CLONE_ID":clone_id,
                 "OWNER_ID":str(owner_id),"BRANDING_IMAGE_URL":self.branding_url,"SMALL_CAPS":"true"}
-        config.update(extra_environment or {})
+        reserved = {"BOT_TOKEN", "DATABASE_URL", "CLONE_ID", "OWNER_ID", "BRANDING_IMAGE_URL", "SMALL_CAPS"}
+        for key, value in (extra_environment or {}).items():
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key):
+                raise ValueError(f"Invalid environment variable name: {key!r}")
+            if key in reserved:
+                raise ValueError(f"{key} is managed by Clone Manager and cannot be overridden.")
+            config[key] = str(value)
         path=folder/f"config-{secrets.token_hex(8)}.json"
         path.write_text(json.dumps(config,ensure_ascii=False),encoding="utf-8"); os.chmod(path,0o600)
         return path
