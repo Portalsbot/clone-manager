@@ -246,7 +246,7 @@ async def message_fsubs_gate(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not user or not message or _is_admin(user.id, context):
         return
     text = message.text or ""
-    if pending and text.split()[0].lower().startswith("/start"):
+    if text and text.split()[0].split("@", 1)[0].lower() == "/start":
         parts = text.split(maxsplit=1)
         context.user_data["fsubs_pending_payload"] = parts[1].strip() if len(parts) > 1 else None
     missing = await _missing_channels(context, user.id)
