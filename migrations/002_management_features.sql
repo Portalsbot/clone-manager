@@ -27,3 +27,7 @@ ALTER TABLE clone_instances
     ADD COLUMN IF NOT EXISTS image_ref TEXT,
     ADD COLUMN IF NOT EXISTS hosting_provider TEXT NOT NULL DEFAULT 'docker',
     ADD COLUMN IF NOT EXISTS encrypted_environment TEXT;
+
+ALTER TABLE clone_instances
+    ADD COLUMN IF NOT EXISTS docker_network TEXT,
+    ADD COLUMN IF NOT EXISTS restart_policy TEXT NOT NULL DEFAULT 'unless-stopped';

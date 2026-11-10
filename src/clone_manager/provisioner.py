@@ -1,13 +1,14 @@
-"""Docker provisioning adapter.
-
-Production note: mount CLONE_SECRET_DIR from a root-controlled host volume. The per-clone
-config file contains plaintext secrets while the container is running, so protect the host
-filesystem and Docker socket as highly privileged infrastructure.
-"""
+"""Docker provisioning and container replacement for generated clones."""
 from __future__ import annotations
-import json, os, re
+
+import json
+import os
+import re
+import secrets
 from pathlib import Path
+
 import docker
+
 
 class DockerProvisioner:
     def __init__(self):
@@ -21,44 +22,98 @@ class DockerProvisioner:
         self.registry_user=os.getenv("GHCR_USERNAME")
         self.registry_token=os.getenv("GHCR_TOKEN")
 
-    async def create(self,product:str,clone_id:str,bot_token:str,owner_id:int)->str:
-        image=self.file_image if product=="file" else self.link_image
+    def _safe(self,clone_id):
+        return re.sub(r"[^a-zA-Z0-9_.-]","-",clone_id)
+
+    def _image(self,product,image_ref):
+        image=image_ref or (self.file_image if product=="file" else self.link_image)
         if not image: raise RuntimeError(f"Image not configured for product: {product}")
+        return image
+
+    def _pull(self,image):
         if self.registry_user and self.registry_token:
             self.client.login(username=self.registry_user,password=self.registry_token,registry="ghcr.io")
         self.client.images.pull(image)
-        self.secret_root.mkdir(parents=True,exist_ok=True,mode=0o700)
-        os.chmod(self.secret_root,0o700)
-        safe=re.sub(r"[^a-zA-Z0-9_.-]","-",clone_id)
-        secret_dir=self.secret_root/safe
-        secret_dir.mkdir(parents=True,exist_ok=True,mode=0o700)
-        os.chmod(secret_dir,0o700)
-        config_file=secret_dir/"config.json"
+
+    def _config_file(self,clone_id,bot_token,owner_id,extra_environment):
+        self.secret_root.mkdir(parents=True,exist_ok=True,mode=0o700); os.chmod(self.secret_root,0o700)
+        folder=self.secret_root/self._safe(clone_id)
+        folder.mkdir(parents=True,exist_ok=True,mode=0o700); os.chmod(folder,0o700)
         config={"BOT_TOKEN":bot_token,"DATABASE_URL":self.database_url,"CLONE_ID":clone_id,
                 "OWNER_ID":str(owner_id),"BRANDING_IMAGE_URL":self.branding_url,"SMALL_CAPS":"true"}
-        config_file.write_text(json.dumps(config),encoding="utf-8")
-        os.chmod(config_file,0o600)
-        container=self.client.containers.run(
-            image,detach=True,name=f"tg-{safe}",
+        config.update(extra_environment or {})
+        path=folder/f"config-{secrets.token_hex(8)}.json"
+        path.write_text(json.dumps(config,ensure_ascii=False),encoding="utf-8"); os.chmod(path,0o600)
+        return path
+
+    def _run(self,image,product,clone_id,path,network,restart_policy):
+        return self.client.containers.run(
+            image,detach=True,name=f"tg-{self._safe(clone_id)}",
             environment={"CONFIG_FILE":"/run/secrets/app-config.json"},
-            volumes={str(config_file):{"bind":"/run/secrets/app-config.json","mode":"ro"}},
-            network=self.network, restart_policy={"Name":"unless-stopped"},
+            volumes={str(path):{"bind":"/run/secrets/app-config.json","mode":"ro"}},
+            network=network if network is not None else self.network,
+            restart_policy={"Name":restart_policy},
             labels={"app":"telegram-clone","clone_id":clone_id,"product":product},
         )
-        return container.id
 
-    async def stop(self,container_id:str):
-        self.client.containers.get(container_id).stop(timeout=15)
+    def _create_sync(self,product,clone_id,token,owner_id,image_ref,network,restart_policy,extra_environment):
+        image=self._image(product,image_ref); self._pull(image)
+        path=self._config_file(clone_id,token,owner_id,extra_environment)
+        try: return self._run(image,product,clone_id,path,network,restart_policy).id
+        except Exception: path.unlink(missing_ok=True); raise
 
-    async def restart(self,container_id:str):
-        self.client.containers.get(container_id).restart(timeout=15)
+    async def create(self,product,clone_id,bot_token,owner_id,*,image_ref=None,network=None,
+                     restart_policy="unless-stopped",extra_environment=None):
+        import asyncio
+        return await asyncio.to_thread(self._create_sync,product,clone_id,bot_token,owner_id,
+                                       image_ref,network,restart_policy,extra_environment or {})
 
-    async def status(self, container_id: str) -> str:
-        """Return the current Docker state; unknown is never reported as stopped."""
+    def _redeploy_sync(self,product,clone_id,token,owner_id,current_id,image_ref,network,restart_policy,extra_environment):
+        image=self._image(product,image_ref); self._pull(image)
+        path=self._config_file(clone_id,token,owner_id,extra_environment)
+        name=f"tg-{self._safe(clone_id)}"
+        old=self.client.containers.get(current_id) if current_id else None
+        backup=f"{name}-backup-{secrets.token_hex(3)}"
+        new=None
+        if old:
+            old.stop(timeout=20); old.rename(backup)
         try:
-            container=self.client.containers.get(container_id)
-            container.reload()
-            state=(container.attrs.get("State") or {}).get("Status","unknown")
-            return "running" if state=="running" else "stopped" if state in {"exited","created","dead"} else "unknown"
+            new=self._run(image,product,clone_id,path,network,restart_policy)
+            new_id=new.id
+            if old: old.remove(force=True)
+            for stale in path.parent.glob("config-*.json"):
+                if stale!=path: stale.unlink(missing_ok=True)
+            return new_id
         except Exception:
-            return "unknown"
+            if new is not None:
+                try: new.remove(force=True)
+                except Exception: pass
+            if old:
+                try: old.rename(name); old.start()
+                except Exception: pass
+            path.unlink(missing_ok=True)
+            raise
+
+    async def redeploy(self,product,clone_id,bot_token,owner_id,*,current_container_id,
+                       image_ref=None,network=None,restart_policy="unless-stopped",extra_environment=None):
+        import asyncio
+        return await asyncio.to_thread(self._redeploy_sync,product,clone_id,bot_token,owner_id,
+                                       current_container_id,image_ref,network,restart_policy,extra_environment or {})
+
+    async def stop(self,container_id):
+        import asyncio
+        await asyncio.to_thread(lambda:self.client.containers.get(container_id).stop(timeout=15))
+
+    async def restart(self,container_id):
+        import asyncio
+        await asyncio.to_thread(lambda:self.client.containers.get(container_id).restart(timeout=15))
+
+    async def status(self,container_id):
+        import asyncio
+        def inspect():
+            try:
+                container=self.client.containers.get(container_id); container.reload()
+                state=(container.attrs.get("State") or {}).get("Status","unknown")
+                return "running" if state=="running" else "stopped" if state in {"exited","created","dead"} else "unknown"
+            except Exception: return "unknown"
+        return await asyncio.to_thread(inspect)

@@ -18,7 +18,7 @@ Private Telegram control bot for provisioning and managing the separate File Sha
 | `/help` | Help menu |
 | `/commands` | Owner/Admin command list |
 | `/settings` | Settings dashboard |
-| `/broadcast` | Immediate text/media broadcast and report |
+| `/broadcast` | Immediate and scheduled text/media broadcast, queue and report |
 | `/users` | User lookup, info, block/unblock, activity |
 | `/stats` | User, clone, period and system-health statistics |
 | `/logs` | User, clone, broadcast, error and admin activity logs |
@@ -37,7 +37,7 @@ Private Telegram control bot for provisioning and managing the separate File Sha
 | `/clones` | Clone dashboard with live Docker status |
 | `/stopclone` | Select and stop a clone |
 | `/restartclone` | Select and restart a clone |
-| `/clonedit` | Edit a clone-specific message override |
+| `/clonedit` | Edit clone name, token, repository/image, Docker hosting settings, encrypted environment and messages; redeploy changes |
 | `/cloneinfo` | View clone details |
 | `/texts` | Browse editable manager and clone messages |
 | `/edittext` | Edit a selected message |

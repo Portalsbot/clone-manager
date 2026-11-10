@@ -69,6 +69,10 @@ async def select_product(update:Update,context:ContextTypes.DEFAULT_TYPE):
         footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
+    pending_edit=context.user_data.get("pending_clone_edit")
+    if pending_edit:
+        await _capture_clone_edit(update,context,pending_edit)
+        return
     product=context.user_data.get("pending_clone_product")
     if not product or not update.effective_message or not update.effective_message.text: return
     if not _allowed(update.effective_user.id,context):
@@ -96,12 +100,13 @@ async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if existing:
         await _send(update,context,"ᴛʜɪs ʙᴏᴛ ᴛᴏᴋᴇɴ ɪs ᴀʟʀᴇᴀᴅʏ ʀᴇɢɪsᴛᴇʀᴇᴅ. ᴜsᴇ /clones ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ɪɴsᴛᴀɴᴄᴇs.")
         return
+    owner_id=context.application.bot_data["owner_id"]
     await db.require().execute(
-        "INSERT INTO clone_instances(clone_id,owner_id,product,bot_id,bot_username,encrypted_token,status) VALUES($1,$2,$3,$4,$5,$6,'provisioning')",
-        clone_id,update.effective_user.id,product,me.id,me.username or str(me.id),encrypted)
+        "INSERT INTO clone_instances(clone_id,owner_id,product,bot_id,bot_username,bot_name,encrypted_token,status) VALUES($1,$2,$3,$4,$5,$6,$7,'provisioning')",
+        clone_id,owner_id,product,me.id,me.username or str(me.id),me.first_name,encrypted)
     try:
         provisioner=context.application.bot_data["provisioner"]
-        container_id=await provisioner.create(product,clone_id,token,update.effective_user.id)
+        container_id=await provisioner.create(product,clone_id,token,owner_id)
         await db.require().execute("UPDATE clone_instances SET container_id=$1,status='running',updated_at=NOW() WHERE clone_id=$2",container_id,clone_id)
         success_template=await db.get_text(context.application.bot_data["clone_id"],"cloner.success",context.application.bot_data["defaults"]["cloner.success"])
         await _send(update,context,success_template.format(username=me.username or me.id,product=product.title(),clone_id=clone_id))
@@ -279,57 +284,202 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
     keyboard.append([InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")])
     await _send(update,context,"(Quote start) ᴏᴏʜ~! ᴡᴀɴᴛ ᴛᴏ ᴋɴᴏᴡ ᴇᴠᴇʀʏᴛʜɪɴɢ ᴀʙᴏᴜᴛ ᴏɴᴇ ᴏғ ʏᴏᴜʀ ʟɪᴛᴛʟᴇ ʙᴏᴛs, sᴇɴᴘᴀɪ? 🎀\\n\\nᴄʜᴏᴏsᴇ ᴀ ᴄʟᴏɴᴇ ᴀɴᴅ ɪ'ʟʟ sʜᴏᴡ ʏᴏᴜ ɪᴛs ᴅᴇᴛᴀɪʟs! ♡ (Quote end)",InlineKeyboardMarkup(keyboard))
 
-async def cloneedit(update:Update,context:ContextTypes.DEFAULT_TYPE):
+async def clonedit(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if not _allowed(update.effective_user.id,context):
         await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ."); return
+    db=context.application.bot_data["db"]
+    if context.args:
+        row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",context.args[0],context.application.bot_data["owner_id"])
+        if not row: await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
+        await _show_clone_edit_menu(update,context,row); return
     rows=await _live_clone_rows(context)
-    if not rows:
-        await _send(update,context,"ɴᴏ ᴄʟᴏɴᴇs ᴀʀᴇ ᴀᴠᴀɪʟᴀʙʟᴇ ᴛᴏ ᴇᴅɪᴛ."); return
-    if len(context.args)==2:
-        clone_id,key=context.args
-        exists=await context.application.bot_data["db"].require().fetchrow("SELECT clone_id FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
-        if not exists or key not in {"file.start","file.about","file.help","link.start","link.about","link.help"}:
-            await _send(update,context,"ɪɴᴠᴀʟɪᴅ ᴄʟᴏɴᴇ ɪᴅ ᴏʀ ᴍᴇssᴀɢᴇ ᴋᴇʏ."); return
-        context.user_data["editing_text_key"]=key
-        context.user_data["editing_clone_id"]=clone_id
-        current=await context.application.bot_data["db"].get_text(clone_id,key,"")
-        await _send(update,context,f"(Quote start) ᴇᴅɪᴛɪɴɢ {key} ғᴏʀ {clone_id}. (Quote end)\\n\\nᴄᴜʀʀᴇɴᴛ ᴛᴇxᴛ:\\n{current}\\n\\nsᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴛᴇxᴛ ɴᴏᴡ.")
-        return
-    buttons=[]
-    for row in rows:
-        icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
-        buttons.append(InlineKeyboardButton(f"{icon} @{row['bot_username']}",callback_data=f"clone:edit:{row['clone_id']}"))
+    if not rows: await _send(update,context,"ɴᴏ ᴄʟᴏɴᴇs ᴀʀᴇ ᴀᴠᴀɪʟᴀʙʟᴇ ᴛᴏ ᴇᴅɪᴛ."); return
+    buttons=[InlineKeyboardButton(("🟢 " if r["status"]=="running" else "🔴 " if r["status"]=="stopped" else "⚪ ")+f"@{r['bot_username']}",callback_data=f"clone:edit:{r['clone_id']}") for r in rows]
     keyboard=[buttons[i:i+2] for i in range(0,len(buttons),2)]
     keyboard.append([InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")])
-    await _send(update,context,"(Quote start) ᴇᴇᴇ~! ᴡʜɪᴄʜ ʟɪᴛᴛʟᴇ ᴄʟᴏɴᴇ ɴᴇᴇᴅs ᴀ ᴍᴀᴋᴇᴏᴠᴇʀ, sᴇɴᴘᴀɪ? 🎀\\n\\nsᴇʟᴇᴄᴛ ᴀ ᴄʟᴏɴᴇ ᴛᴏ ᴇᴅɪᴛ ɪᴛs ᴍᴇssᴀɢᴇs. (Quote end)",InlineKeyboardMarkup(keyboard))
+    await _send(update,context,"(Quote start) ᴄʜᴏᴏsᴇ ᴀ ᴄʟᴏɴᴇ ᴛᴏ ᴇᴅɪᴛ ɪᴛs ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ, sᴇɴᴘᴀɪ! 🎀 (Quote end)",InlineKeyboardMarkup(keyboard))
+
+
+async def _show_clone_edit_menu(update,context,row):
+    clone_id=row["clone_id"]
+    count=0
+    if row["encrypted_environment"]:
+        try: count=len(json.loads(Fernet(context.application.bot_data["encryption_key"]).decrypt(row["encrypted_environment"].encode()).decode()))
+        except Exception: count=-1
+    body=(f"(Quote start) ᴄʟᴏɴᴇ ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ · @{row['bot_username']} (Quote end)\n\n"
+          f"ɪᴅ: {clone_id}\nɴᴀᴍᴇ: {row['bot_name'] or 'not customised'}\n"
+          f"ʀᴇᴘᴏsɪᴛᴏʀʏ: {row['repository_url'] or row['image_ref'] or 'product default'}\n"
+          f"ʜᴏsᴛɪɴɢ: {row['hosting_provider'] or 'docker'}\n"
+          f"ᴇɴᴠɪʀᴏɴᴍᴇɴᴛ ᴠᴀʀɪᴀʙʟᴇs: {'unreadable' if count<0 else count}\n"
+          f"Dᴏᴄᴋᴇʀ ɴᴇᴛᴡᴏʀᴋ: {row['docker_network'] or 'default'}\n"
+          f"ʀᴇsᴛᴀʀᴛ ᴘᴏʟɪᴄʏ: {row['restart_policy'] or 'unless-stopped'}")
+    markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton("· ʙᴏᴛ ɴᴀᴍᴇ ·",callback_data=f"clone:editfield:{clone_id}:name"),InlineKeyboardButton("· ʙᴏᴛ ᴛᴏᴋᴇɴ ·",callback_data=f"clone:editfield:{clone_id}:token")],
+        [InlineKeyboardButton("· ʀᴇᴘᴏsɪᴛᴏʀʏ ·",callback_data=f"clone:editfield:{clone_id}:repository"),InlineKeyboardButton("· ʜᴏsᴛɪɴɢ ·",callback_data=f"clone:editfield:{clone_id}:hosting")],
+        [InlineKeyboardButton("· ᴇɴᴠɪʀᴏɴᴍᴇɴᴛ ·",callback_data=f"clone:editfield:{clone_id}:environment"),InlineKeyboardButton("· ᴍᴇssᴀɢᴇs ·",callback_data=f"clone:editfield:{clone_id}:messages")],
+        [InlineKeyboardButton("· ᴅᴇᴘʟᴏʏ ᴀɢᴀɪɴ ·",callback_data=f"clone:deploy:{clone_id}"),InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")]
+    ])
+    await _send(update,context,body,markup)
+
+
+def _parse_environment(text:str)->dict[str,str]:
+    protected={"BOT_TOKEN","DATABASE_URL","OWNER_ID","CLONE_ID","CONFIG_FILE","BRANDING_IMAGE_URL"}
+    result={}
+    for line in text.splitlines():
+        line=line.strip()
+        if not line or line.startswith("#"): continue
+        if "=" not in line: raise ValueError("ᴜsᴇ KEY=VALUE, ᴏɴᴇ ᴠᴀʀɪᴀʙʟᴇ ᴘᴇʀ ʟɪɴᴇ.")
+        key,value=line.split("=",1); key=key.strip()
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}",key) or key in protected: raise ValueError(f"ɪɴᴠᴀʟɪᴅ ᴏʀ ʀᴇsᴇʀᴠᴇᴅ ᴋᴇʏ: {key}")
+        if len(value)>4000: raise ValueError(f"ᴠᴀʟᴜᴇ ғᴏʀ {key} ɪs ᴛᴏᴏ ʟᴏɴɢ.")
+        result[key]=value
+    if len(result)>100: raise ValueError("ᴍᴀxɪᴍᴜᴍ 100 ᴄᴜsᴛᴏᴍ ᴠᴀʀɪᴀʙʟᴇs ᴀʀᴇ ᴀʟʟᴏᴡᴇᴅ.")
+    return result
+
+
+def _parse_repository(value:str)->tuple[str|None,str]:
+    from urllib.parse import urlparse
+    value=value.strip(); parsed=urlparse(value)
+    if parsed.scheme in {"http","https"} and parsed.netloc.lower() in {"github.com","www.github.com"}:
+        parts=[p for p in parsed.path.strip("/").split("/") if p]
+        if len(parts)<2: raise ValueError("sᴇɴᴅ ᴀ GɪᴛHᴜʙ ʀᴇᴘᴏsɪᴛᴏʀʏ URL ᴡɪᴛʜ ᴏᴡɴᴇʀ ᴀɴᴅ ʀᴇᴘᴏsɪᴛᴏʀʏ.")
+        owner,repo=parts[:2]; repo=repo.removesuffix(".git")
+        return f"https://github.com/{owner}/{repo}",f"ghcr.io/{owner.lower()}/{repo.lower()}:latest"
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{1,254}",value) or "://" in value:
+        raise ValueError("sᴇɴᴅ ᴀ GɪᴛHᴜʙ ʀᴇᴘᴏ URL ᴏʀ Dᴏᴄᴋᴇʀ ɪᴍᴀɢᴇ ʀᴇғᴇʀᴇɴᴄᴇ.")
+    return None,value
+
+
+async def _start_clone_edit(update,context,clone_id,field):
+    db=context.application.bot_data["db"]
+    row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
+    if not row: await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
+    if field=="messages":
+        product=row["product"]; keys=[f"{product}.start",f"{product}.about",f"{product}.help"]
+        markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("· ᴇᴅɪᴛ sᴛᴀʀᴛ ·",callback_data=f"clone:editkey:{clone_id}:{keys[0]}"),InlineKeyboardButton("· ᴇᴅɪᴛ ᴀʙᴏᴜᴛ ·",callback_data=f"clone:editkey:{clone_id}:{keys[1]}")],
+            [InlineKeyboardButton("· ᴇᴅɪᴛ ʜᴇʟᴘ ·",callback_data=f"clone:editkey:{clone_id}:{keys[2]}")],
+            [InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data=f"clone:edit:{clone_id}")]
+        ])
+        await _send(update,context,f"(Quote start) ᴍᴇssᴀɢᴇ ᴇᴅɪᴛᴏʀ ғᴏʀ @{row['bot_username']} (Quote end)",markup); return
+    if field not in {"name","token","repository","hosting","environment"}:
+        await _send(update,context,"ᴜɴᴋɴᴏᴡɴ ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ ғɪᴇʟᴅ."); return
+    context.user_data["pending_clone_edit"]={"clone_id":clone_id,"field":field}
+    prompts={
+      "name":"sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴅɪsᴘʟᴀʏ ɴᴀᴍᴇ (ᴍᴀx 64 ᴄʜᴀʀᴀᴄᴛᴇʀs).",
+      "token":"sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ʙᴏᴛғᴀᴛʜᴇʀ ᴛᴏᴋᴇɴ ғᴏʀ ᴛʜᴇ sᴀᴍᴇ ʙᴏᴛ. ᴛʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ.",
+      "repository":"sᴇɴᴅ ᴀ GɪᴛHᴜʙ ʀᴇᴘᴏ URL ᴏʀ ᴀ Dᴏᴄᴋᴇʀ ɪᴍᴀɢᴇ ʀᴇғᴇʀᴇɴᴄᴇ. GɪᴛHᴜʙ URLs ᴍᴀᴘ ᴛᴏ ɢʜᴄʀ.ɪᴏ/{owner}/{repo}:latest; ᴛʜᴇ ɪᴍᴀɢᴇ ᴍᴜsᴛ ʙᴇ ᴘᴜʙʟɪsʜᴇᴅ.",
+      "hosting":"sᴇɴᴅ network=NAME ᴀɴᴅ restart_policy=VALUE ᴏɴ sᴇᴘᴀʀᴀᴛᴇ ʟɪɴᴇs. ᴜsᴇ default ғᴏʀ ᴛʜᴇ ᴅᴇғᴀᴜʟᴛ ɴᴇᴛᴡᴏʀᴋ. ᴠᴀʟɪᴅ ᴘᴏʟɪᴄɪᴇs: no, always, unless-stopped, on-failure. ᴛʜɪs ᴄʟᴏɴᴇ ʀᴜɴs ᴏɴ ᴛʜᴇ ᴄᴏɴғɪɢᴜʀᴇᴅ Dᴏᴄᴋᴇʀ ʜᴏsᴛ.",
+      "environment":"sᴇɴᴅ ᴄᴜsᴛᴏᴍ ᴠᴀʀɪᴀʙʟᴇs ᴀs KEY=VALUE, ᴏɴᴇ ᴘᴇʀ ʟɪɴᴇ. ᴄᴏʀᴇ sᴇᴄʀᴇᴛs ᴀʀᴇ ᴘʀᴏᴛᴇᴄᴛᴇᴅ; ᴠᴀʟᴜᴇs ᴀʀᴇ ᴇɴᴄʀʏᴘᴛᴇᴅ."
+    }
+    await _send(update,context,prompts[field],InlineKeyboardMarkup([[InlineKeyboardButton("· ᴄᴀɴᴄᴇʟ ·",callback_data=f"clone:edit:{clone_id}")]]))
+
+
+async def _redeploy_clone(update,context,row,token_override=None):
+    db=context.application.bot_data["db"]; cipher=Fernet(context.application.bot_data["encryption_key"])
+    token=token_override or cipher.decrypt(row["encrypted_token"].encode()).decode()
+    env=json.loads(cipher.decrypt(row["encrypted_environment"].encode()).decode()) if row["encrypted_environment"] else {}
+    new_id=await context.application.bot_data["provisioner"].redeploy(
+        row["product"],row["clone_id"],token,context.application.bot_data["owner_id"],
+        current_container_id=row["container_id"],image_ref=row["image_ref"] or None,
+        network=row["docker_network"],restart_policy=row["restart_policy"] or "unless-stopped",
+        extra_environment=env)
+    encrypted=cipher.encrypt(token.encode()).decode()
+    await db.require().execute("UPDATE clone_instances SET container_id=$1,encrypted_token=$2,status='running',error_code=NULL,updated_at=NOW() WHERE clone_id=$3",new_id,encrypted,row["clone_id"])
+    await _send(update,context,f"ᴄʟᴏɴᴇ @{row['bot_username']} ʜᴀs ʙᴇᴇɴ ʀᴇᴅᴇᴘʟᴏʏᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.")
+
+
+async def _capture_clone_edit(update,context,pending):
+    message=update.effective_message
+    if not message or not message.text: return
+    if not _allowed(update.effective_user.id,context):
+        context.user_data.pop("pending_clone_edit",None); return
+    clone_id,field=pending["clone_id"],pending["field"]; db=context.application.bot_data["db"]
+    row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
+    if not row:
+        context.user_data.pop("pending_clone_edit",None); await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
+    value=message.text.strip()
+    if field=="token":
+        try: await message.delete()
+        except Exception: log.warning("Could not delete replacement token message")
+        try:
+            new_bot=Bot(token=value); await new_bot.initialize()
+            try: identity=await new_bot.get_me()
+            finally: await new_bot.shutdown()
+            if identity.id!=row["bot_id"]: raise ValueError("Token belongs to a different bot")
+            await _redeploy_clone(update,context,row,token_override=value)
+            context.user_data.pop("pending_clone_edit",None)
+        except Exception as exc:
+            log.warning("Bot token replacement failed (%s)",type(exc).__name__)
+            await _send(update,context,f"ɴᴇᴡ ᴛᴏᴋᴇɴ ɴᴏᴛ ᴀᴘᴘʟɪᴇᴅ: {type(exc).__name__}. ᴛʀʏ ᴀɢᴀɪɴ ᴏʀ ᴄʜᴇᴄᴋ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ.")
+        return
+    if field=="name":
+        if not value or len(value)>64: await _send(update,context,"ɴᴀᴍᴇ ᴍᴜsᴛ ʙᴇ 1–64 ᴄʜᴀʀᴀᴄᴛᴇʀs."); return
+        token=Fernet(context.application.bot_data["encryption_key"]).decrypt(row["encrypted_token"].encode()).decode()
+        bot=Bot(token=token)
+        try:
+            await bot.initialize()
+            try: await bot.set_my_name(value)
+            finally: await bot.shutdown()
+        except Exception as exc: await _send(update,context,f"ᴄᴏᴜʟᴅ ɴᴏᴛ ᴜᴘᴅᴀᴛᴇ ɴᴀᴍᴇ: {type(exc).__name__}."); return
+        await db.require().execute("UPDATE clone_instances SET bot_name=$1,updated_at=NOW() WHERE clone_id=$2",value,clone_id)
+    elif field=="repository":
+        try: repo_url,image_ref=_parse_repository(value)
+        except ValueError as exc: await _send(update,context,str(exc)); return
+        await db.require().execute("UPDATE clone_instances SET repository_url=$1,image_ref=$2,updated_at=NOW() WHERE clone_id=$3",repo_url,image_ref,clone_id)
+    elif field=="hosting":
+        items={}
+        for line in value.splitlines():
+            if not line.strip(): continue
+            if "=" not in line: await _send(update,context,"ᴜsᴇ network=NAME ᴀɴᴅ restart_policy=VALUE ᴏɴ sᴇᴘᴀʀᴀᴛᴇ ʟɪɴᴇs."); return
+            key,val=line.split("=",1); items[key.strip()]=val.strip()
+        if set(items)-{"network","restart_policy"}: await _send(update,context,"ᴏɴʟʏ network ᴀɴᴅ restart_policy ᴀʀᴇ ᴀʟʟᴏᴡᴇᴅ."); return
+        network=items.get("network",row["docker_network"] or "default")
+        if network.lower()=="default": network=None
+        elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}",network): await _send(update,context,"ɪɴᴠᴀʟɪᴅ Dᴏᴄᴋᴇʀ ɴᴇᴛᴡᴏʀᴋ."); return
+        policy=items.get("restart_policy",row["restart_policy"] or "unless-stopped")
+        if policy not in {"no","always","unless-stopped","on-failure"}: await _send(update,context,"ɪɴᴠᴀʟɪᴅ ʀᴇsᴛᴀʀᴛ ᴘᴏʟɪᴄʏ."); return
+        await db.require().execute("UPDATE clone_instances SET docker_network=$1,restart_policy=$2,updated_at=NOW() WHERE clone_id=$3",network,policy,clone_id)
+    elif field=="environment":
+        try: env=_parse_environment(value)
+        except ValueError as exc: await _send(update,context,str(exc)); return
+        secret=Fernet(context.application.bot_data["encryption_key"]).encrypt(json.dumps(env,ensure_ascii=False).encode()).decode()
+        await db.require().execute("UPDATE clone_instances SET encrypted_environment=$1,updated_at=NOW() WHERE clone_id=$2",secret,clone_id)
+    context.user_data.pop("pending_clone_edit",None)
+    await _send(update,context,"ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ sᴀᴠᴇᴅ. ᴘʀᴇss ᴅᴇᴘʟᴏʏ ᴀɢᴀɪɴ ᴛᴏ ᴀᴘᴘʟʏ ᴛʜᴇ ᴄʜᴀɴɢᴇs.",
+                InlineKeyboardMarkup([[InlineKeyboardButton("· ᴏᴘᴇɴ ᴄʟᴏɴᴇ ᴇᴅɪᴛᴏʀ ·",callback_data=f"clone:edit:{clone_id}")]]))
+
 
 async def clone_edit_callback(update,context):
     q=update.callback_query
-    if not _allowed(q.from_user.id,context):
-        await q.answer("Owner / Admin only.",show_alert=True); return
-    await q.answer()
-    parts=q.data.split(":")
-    db=context.application.bot_data["db"]
+    if not _allowed(q.from_user.id,context): await q.answer("Owner / Admin only.",show_alert=True); return
+    await q.answer(); parts=q.data.split(":"); db=context.application.bot_data["db"]
     if parts[1]=="edit":
-        clone_id=parts[2]
-        row=await db.require().fetchrow("SELECT clone_id,product,bot_username FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
-        if not row:
-            await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
-        product=row["product"]
-        keys=[f"{product}.start",f"{product}.about",f"{product}.help"]
-        labels=["· ᴇᴅɪᴛ sᴛᴀʀᴛ ·","· ᴇᴅɪᴛ ᴀʙᴏᴜᴛ ·","· ᴇᴅɪᴛ ʜᴇʟᴘ ·"]
-        keyboard=[[InlineKeyboardButton(labels[0],callback_data=f"clone:editkey:{clone_id}:{keys[0]}"),InlineKeyboardButton(labels[1],callback_data=f"clone:editkey:{clone_id}:{keys[1]}")],[InlineKeyboardButton(labels[2],callback_data=f"clone:editkey:{clone_id}:{keys[2]}")]]
-        keyboard.append([InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")])
-        await _send(update,context,f"(Quote start) ᴄʜᴏᴏsᴇ ᴡʜɪᴄʜ ᴍᴇssᴀɢᴇ ᴛᴏ ᴇᴅɪᴛ ғᴏʀ @{row['bot_username']}. (Quote end)",InlineKeyboardMarkup(keyboard))
+        row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",parts[2],context.application.bot_data["owner_id"])
+        if not row: await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
+        await _show_clone_edit_menu(update,context,row)
+    elif parts[1]=="editfield" and len(parts)==4:
+        await _start_clone_edit(update,context,parts[2],parts[3])
     elif parts[1]=="editkey" and len(parts)==4:
         clone_id,key=parts[2],parts[3]
         row=await db.require().fetchrow("SELECT clone_id FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
         if not row or key not in {"file.start","file.about","file.help","link.start","link.about","link.help"}:
             await _send(update,context,"ɪɴᴠᴀʟɪᴅ ᴄʟᴏɴᴇ ᴏʀ ᴍᴇssᴀɢᴇ."); return
-        context.user_data["editing_text_key"]=key
-        context.user_data["editing_clone_id"]=clone_id
+        context.user_data["editing_text_key"]=key; context.user_data["editing_clone_id"]=clone_id
         current=await db.get_text(clone_id,key,"")
-        await _send(update,context,f"(Quote start) ᴇᴅɪᴛɪɴɢ {key} (Quote end)\\n\\nᴄᴜʀʀᴇɴᴛ ᴛᴇxᴛ:\\n{current}\\n\\nsᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴛᴇxᴛ ɴᴏᴡ.")
+        await _send(update,context,f"(Quote start) ᴇᴅɪᴛɪɴɢ {key} (Quote end)\n\nᴄᴜʀʀᴇɴᴛ ᴛᴇxᴛ:\n{current}\n\nsᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴛᴇxᴛ ɴᴏᴡ.")
+    elif parts[1]=="deploy":
+        clone_id=parts[2]
+        markup=InlineKeyboardMarkup([[InlineKeyboardButton("· ʏᴇs, ᴅᴇᴘʟᴏʏ ·",callback_data=f"clone:redeploy:{clone_id}"),InlineKeyboardButton("· ᴄᴀɴᴄᴇʟ ·",callback_data=f"clone:edit:{clone_id}")]])
+        await _send(update,context,"(Quote start) ʀᴇᴘʟᴀᴄᴇ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴄᴏɴᴛᴀɪɴᴇʀ ᴡɪᴛʜ ᴛʜᴇ sᴀᴠᴇᴅ ᴄᴏɴғɪɢᴜʀᴀᴛɪᴏɴ? (Quote end)",markup)
+    elif parts[1]=="redeploy":
+        row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",parts[2],context.application.bot_data["owner_id"])
+        if not row: await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
+        try: await _redeploy_clone(update,context,row)
+        except Exception as exc:
+            log.exception("Clone redeploy failed (%s)",type(exc).__name__)
+            await _send(update,context,f"ʀᴇᴅᴇᴘʟᴏʏ ғᴀɪʟᴇᴅ: {type(exc).__name__}.")
+
 
 async def clonepreview(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if not _allowed(update.effective_user.id,context):
@@ -405,11 +555,11 @@ def add_clone_handlers(app):
     app.add_handler(CommandHandler("clones",clones))
     app.add_handler(CommandHandler("stopclone",stopclone))
     app.add_handler(CommandHandler("restartclone",restartclone))
-    app.add_handler(CommandHandler("cloneedit",cloneedit))
+    app.add_handler(CommandHandler("clonedit",clonedit))
     app.add_handler(CommandHandler("cloneinfo",cloneinfo))
     app.add_handler(CallbackQueryHandler(select_product,pattern=r"^clone:select:(file|link)$"))
     app.add_handler(CallbackQueryHandler(clones_filter_callback,pattern=r"^clones:(all|running|stopped|recent|file|link|refresh)$"))
     app.add_handler(CallbackQueryHandler(clone_detail_callback,pattern=r"^clone:detail:"))
     app.add_handler(CallbackQueryHandler(clone_manage_callback,pattern=r"^clone:(stop|restart|confirm-stop|confirm-restart):"))
-    app.add_handler(CallbackQueryHandler(clone_edit_callback,pattern=r"^clone:(edit|editkey):"))
+    app.add_handler(CallbackQueryHandler(clone_edit_callback,pattern=r"^clone:(edit|editkey|editfield|deploy|redeploy):"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,receive_token),group=-2)
