@@ -21,6 +21,8 @@ async def post_init(app):
     if not await db.get_setting("branding.footer",""):
         await db.set_setting("branding.footer",'(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)')
     app.bot_data["image_url"]=await db.get_setting("branding.image_url",app.bot_data["image_url"])
+    from .formatting import set_quote_enabled
+    set_quote_enabled((await db.get_setting("branding.quote_enabled","true")).lower() in {"on","true"})
 
 async def post_shutdown(app):
     db=app.bot_data.get("db")

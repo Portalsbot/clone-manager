@@ -5,10 +5,17 @@ from urllib.parse import urlparse
 SMALL_CAPS=str.maketrans({"a":"ᴀ","b":"ʙ","c":"ᴄ","d":"ᴅ","e":"ᴇ","f":"ꜰ","g":"ɢ","h":"ʜ","i":"ɪ","j":"ᴊ","k":"ᴋ","l":"ʟ","m":"ᴍ","n":"ɴ","o":"ᴏ","p":"ᴘ","q":"ǫ","r":"ʀ","s":"ѕ","t":"ᴛ","u":"ᴜ","v":"ᴠ","w":"ᴡ","x":"x","y":"ʏ","z":"ᴢ","A":"ᴀ","B":"ʙ","C":"ᴄ","D":"ᴅ","E":"ᴇ","F":"ꜰ","G":"ɢ","H":"ʜ","I":"ɪ","J":"ᴊ","K":"ᴋ","L":"ʟ","M":"ᴍ","N":"ɴ","O":"ᴏ","P":"ᴘ","Q":"ǫ","R":"ʀ","S":"ѕ","T":"ᴛ","U":"ᴜ","V":"ᴠ","W":"ᴡ","X":"x","Y":"ʏ","Z":"ᴢ"})
 TOKEN=re.compile(r'\((?P<close>/)?(?P<tag>B|I|U|S|CODE|PRE|Q|SPOILER|LINK)(?:\s+url="(?P<url>[^"]+)")?\)',re.I)
 TAG_MAP={"B":"b","I":"i","U":"u","S":"s","CODE":"code","PRE":"pre","Q":"blockquote","SPOILER":"tg-spoiler"}
+QUOTE_ENABLED = True
+
+def set_quote_enabled(enabled: bool):
+    global QUOTE_ENABLED
+    QUOTE_ENABLED = bool(enabled)
+
 def render_text(source:str,small_caps:bool=True)->str:
     source="" if source is None else str(source)
-    source=re.sub(r"\(Quote start\)", "(Q)", source, flags=re.I)
-    source=re.sub(r"\(Quote end\)", "(/Q)", source, flags=re.I)
+    if QUOTE_ENABLED:
+        source=re.sub(r"\(Quote start\)", "(Q)", source, flags=re.I)
+        source=re.sub(r"\(Quote end\)", "(/Q)", source, flags=re.I)
     source=re.sub(r"\*\*(.+?)\*\*",r"(B)\1(/B)",source,flags=re.S)
     source=re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)",r"(I)\1(/I)",source)
     source=re.sub(r"`([^`\n]+)`",r"(CODE)\1(/CODE)",source)

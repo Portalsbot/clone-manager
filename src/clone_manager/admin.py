@@ -191,6 +191,9 @@ async def editsetting_callback(update,context):
             await q.answer("Use on or off.",show_alert=True); return
         await context.application.bot_data["db"].set_setting(pending["key"],value)
         if pending["key"]=="branding.image_url": context.application.bot_data["image_url"]=value
+        if pending["key"]=="branding.quote_enabled":
+            from .formatting import set_quote_enabled
+            set_quote_enabled(value.lower() in {"on","true"})
         if pending["key"]=="branding.name":
             await context.bot.set_my_name(value[:64])
         context.user_data.pop("pending_setting",None)

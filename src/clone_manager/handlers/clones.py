@@ -1,5 +1,5 @@
 from __future__ import annotations
-import asyncio, logging, secrets, re
+import asyncio, logging, secrets, re, json
 from pathlib import Path
 from cryptography.fernet import Fernet
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
@@ -24,7 +24,14 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("· ᴀʙᴏᴜᴛ ·",callback_data="admin:about"),InlineKeyboardButton("· ᴄʜᴀɴɴᴇʟ ·",callback_data="admin:channel")],
         [InlineKeyboardButton("· ᴄᴏᴍᴍᴀɴᴅs ·",callback_data="admin:commands")]
     ])
-    default_text=f"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {update.effective_user.mention_html()} ~ (Quote end)\\n\\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)"
+    saved_buttons=await context.application.bot_data["db"].get_setting("branding.buttons_json","")
+    if saved_buttons:
+        try:
+            custom=keyboard_from_buttons(json.loads(saved_buttons),small_caps=context.application.bot_data["small_caps"])
+            if custom: markup=custom
+        except (ValueError,TypeError):
+            log.warning("Ignoring invalid persisted start-button layout")
+    default_text=f"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {update.effective_user.mention_html()} ~ (Quote end)\n\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)"
     body=await context.application.bot_data["db"].get_setting("message.start",default_text)
     await _send(update,context,body,markup)
 
@@ -104,7 +111,7 @@ async def clones(update:Update,context:ContextTypes.DEFAULT_TYPE):
                 row["status"]=live
     running=sum(row["status"]=="running" for row in rows)
     stopped=sum(row["status"]=="stopped" for row in rows)
-    body=f"(Quote start) ʏᴏᴜʀ ᴄʟᴏɴᴇ ᴅᴀsʜʙᴏᴀʀᴅ ♡\\n\\nᴛᴏᴛᴀʟ: {len(rows)} · ʀᴜɴɴɪɴɢ: {running} · sᴛᴏᴘᴘᴇᴅ: {stopped} (Quote end)"
+    body=f"(Quote start) ʏᴏᴜʀ ᴄʟᴏɴᴇ ᴅᴀsʜʙᴏᴀʀᴅ ♡\n\nᴛᴏᴛᴀʟ: {len(rows)} · ʀᴜɴɴɪɴɢ: {running} · sᴛᴏᴘᴘᴇᴅ: {stopped} (Quote end)"
     bot_buttons=[]
     for row in rows:
         icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
@@ -124,7 +131,7 @@ async def clone_detail_callback(update,context):
     if not row:
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
     icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
-    body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\\n\\nɴᴀᴍᴇ: @{row['bot_username']}\\nɪᴅ: {row['clone_id']}\\nᴛʏᴘᴇ: {row['product']}\\nsᴛᴀᴛᴜs: {icon} {row['status']}\\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\\nʙᴏᴛ ɪᴅ: {row['bot_id']}\\nᴄᴏɴᴛᴀɪɴᴇʀ: {row['container_id'] or 'not assigned'}\\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
+    body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\n\nɴᴀᴍᴇ: @{row['bot_username']}\nɪᴅ: {row['clone_id']}\nᴛʏᴘᴇ: {row['product']}\nsᴛᴀᴛᴜs: {icon} {row['status']}\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\nʙᴏᴛ ɪᴅ: {row['bot_id']}\nᴄᴏɴᴛᴀɪɴᴇʀ: {row['container_id'] or 'not assigned'}\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
     markup=InlineKeyboardMarkup([[InlineKeyboardButton("· sᴛᴏᴘ ·",callback_data=f"clone:stop:{clone_id}"),InlineKeyboardButton("· ʀᴇsᴛᴀʀᴛ ·",callback_data=f"clone:restart:{clone_id}")]])
     await _send(update,context,body,markup)
 
@@ -200,8 +207,8 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
         if not rows:
             await _send(update,context,"ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ ᴄʀᴇᴀᴛᴇᴅ ᴀɴʏ ᴄʟᴏɴᴇs ʏᴇᴛ.")
             return
-        body="(Quote start) ᴄʜᴏᴏsᴇ ᴀ ᴄʟᴏɴᴇ ᴛᴏ ᴠɪᴇᴡ ɪᴛs ᴅᴇᴛᴀɪʟs! 🎀 (Quote end)\\n\\n"
-        body+="\\n".join(("🟢 " if row["status"]=="running" else "🔴 " if row["status"]=="stopped" else "⚪ ")+f"@{row['bot_username']} — /cloneinfo {row['clone_id']}" for row in rows)
+        body="(Quote start) ᴄʜᴏᴏsᴇ ᴀ ᴄʟᴏɴᴇ ᴛᴏ ᴠɪᴇᴡ ɪᴛs ᴅᴇᴛᴀɪʟs! 🎀 (Quote end)\n\n"
+        body+="\n".join(("🟢 " if row["status"]=="running" else "🔴 " if row["status"]=="stopped" else "⚪ ")+f"@{row['bot_username']} — /cloneinfo {row['clone_id']}" for row in rows)
     else:
         row=await context.application.bot_data["db"].require().fetchrow(
             "SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",context.args[0],update.effective_user.id)
@@ -209,7 +216,7 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
             body="ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."
         else:
             status="🟢 ʀᴜɴɴɪɴɢ" if row["status"]=="running" else "🔴 sᴛᴏᴘᴘᴇᴅ" if row["status"]=="stopped" else "⚪ "+str(row["status"]).upper()
-            body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\\n\\nɴᴀᴍᴇ: @{row['bot_username']}\\nɪᴅ: {row['clone_id']}\\nᴛʏᴘᴇ: {row['product']}\\nsᴛᴀᴛᴜs: {status}\\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\\nʙᴏᴛ ɪᴅ: {row['bot_id']}\\nᴄᴏɴᴛᴀɪɴᴇʀ: {row['container_id'] or 'not assigned'}\\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
+            body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\n\nɴᴀᴍᴇ: @{row['bot_username']}\nɪᴅ: {row['clone_id']}\nᴛʏᴘᴇ: {row['product']}\nsᴛᴀᴛᴜs: {status}\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\nʙᴏᴛ ɪᴅ: {row['bot_id']}\nᴄᴏɴᴛᴀɪɴᴇʀ: {row['container_id'] or 'not assigned'}\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
     await _send(update,context,body)
 
 async def cloneedit(update:Update,context:ContextTypes.DEFAULT_TYPE):
