@@ -449,10 +449,46 @@ async def command_access_gate(update,context):
         from telegram.ext import ApplicationHandlerStop
         raise ApplicationHandlerStop
 
+async def diagnostics(update, context):
+    if not _is_owner(update.effective_user.id, context):
+        await _send(update, context, "ᴅɪᴀɢɴᴏsᴛɪᴄs ᴀʀᴇ ᴏᴡɴᴇʀ-ᴏɴʟʏ.")
+        return
+    results = []
+    try:
+        me = await context.bot.get_me()
+        results.append(f"Telegram API: OK (@{me.username})")
+    except Exception as exc:
+        results.append(f"Telegram API: FAILED ({type(exc).__name__})")
+    try:
+        value = await context.application.bot_data["db"].require().fetchval("SELECT 1")
+        results.append("PostgreSQL: OK" if value == 1 else "PostgreSQL: unexpected response")
+    except Exception as exc:
+        results.append(f"PostgreSQL: FAILED ({type(exc).__name__})")
+    provisioner = context.application.bot_data["provisioner"]
+    try:
+        import asyncio
+        await asyncio.to_thread(provisioner.client.ping)
+        results.append("Docker daemon: OK")
+    except Exception as exc:
+        results.append(f"Docker daemon: FAILED ({type(exc).__name__})")
+    for product, image in (("File Sharing", provisioner.file_image), ("Link Sharing", provisioner.link_image)):
+        results.append(f"{product} image: configured" if image else f"{product} image: MISSING (set the image environment variable)")
+    try:
+        provisioner.secret_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        probe = provisioner.secret_root / ".write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        results.append(f"Clone secret directory: writable ({provisioner.secret_root})")
+    except Exception as exc:
+        results.append(f"Clone secret directory: FAILED ({type(exc).__name__}; set CLONE_SECRET_DIR to a writable host path)")
+    results.append("Docker host note: clone containers and mounted secret files must use the same Docker host filesystem.")
+    await _send(update, context, "**ᴄʟᴏɴᴇ ᴍᴀɴᴀɢᴇʀ ᴅɪᴀɢɴᴏsᴛɪᴄs**\\n\\n" + "\\n".join(results))
+
+
 def add_admin_handlers(app):
     for name,func in [("about",about),("help",help_command),("commands",commands),("settings",settings),
         ("broadcast",broadcast),("users",users),("stats",stats),("logs",logs),("ping",ping),
-        ("restart",restart),("maintenance",maintenance),("setmaintenance",setmaintenance)]:
+        ("restart",restart),("maintenance",maintenance),("setmaintenance",setmaintenance),("diagnostics",diagnostics)]:
         app.add_handler(CommandHandler(name,func))
     for name in EDITABLE:
         async def handler(update,context,n=name): await _register_edit(update,context,n)
