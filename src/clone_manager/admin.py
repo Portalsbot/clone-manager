@@ -174,7 +174,14 @@ async def editsetting_callback(update,context):
     if not pending: return
     action=q.data.split(":")[-1]
     if action=="edit":
-        await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴠᴀʟᴜᴇ ɴᴏᴡ. ɪ'ʟʟ ᴋᴇᴇᴘ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴠᴀʟᴜᴇ ᴜɴᴛɪʟ ʏᴏᴜ sᴀᴠᴇ.")
+        command=pending.get("command")
+        prompts={
+            "setimage":"sᴇɴᴅ ᴏɴʟʏ ᴛʜᴇ ɴᴇᴡ ɪᴍᴀɢᴇ ᴜʀʟ.",
+            "setbuttons":'sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ JSON ᴀʀʀᴀʏ ᴏғ ʙᴜᴛᴛᴏɴ ʀᴏᴡs. ᴇxᴀᴍᴘʟᴇ: [[{"text":"· ᴀʙᴏᴜᴛ ·","callback_data":"admin:about"},{"text":"· ᴄʜᴀɴɴᴇʟ ·","callback_data":"admin:channel"}]]',
+            "setquote":"sᴇɴᴅ ᴏɴ ᴏʀ ᴏғғ.",
+            "setfooter":'sᴇɴᴅ ᴛʜᴇ ғᴏᴏᴛᴇʀ ᴛᴇxᴛ. ᴜsᴇ (LINK url="https://...")ᴛᴇxᴛ(/LINK) ғᴏʀ ᴀ ᴄʟɪᴄᴋᴀʙʟᴇ ʟɪɴᴋ.',
+        }
+        await _send(context,q.message.chat_id,prompts.get(command,"sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴠᴀʟᴜᴇ ɴᴏᴡ. ɪ'ʟʟ ᴋᴇᴇᴘ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴠᴀʟᴜᴇ ᴜɴᴛɪʟ ʏᴏᴜ sᴀᴠᴇ."))
     elif action=="preview":
         value=pending.get("draft",pending["value"])
         if pending["key"]=="branding.image_url":
@@ -272,7 +279,12 @@ async def callback_router(update,context):
         else:
             await _send(context,q.message.chat_id,"ᴜsᴇʀ ᴀᴄᴛɪᴏɴ ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ.")
     elif data.startswith("broadcast:"):
-        if data=="broadcast:report": await _send(context,q.message.chat_id,"ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴘᴏʀᴛ: ɴᴏ ʀᴇᴄᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴄᴏʀᴅ.")
+        if data=="broadcast:report":
+            rows=await context.application.bot_data["db"].require().fetch("SELECT created_at,details FROM manager_activity WHERE action='broadcast' ORDER BY created_at DESC LIMIT 10")
+            report="ʙʀᴏᴀᴅᴄᴀsᴛ ʜɪsᴛᴏʀʏ\\n\\n"+("\\n".join(f"{r['created_at']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴄᴏʀᴅs.")
+            await _send(context,q.message.chat_id,report)
+        elif data=="broadcast:schedule":
+            await _send(context,q.message.chat_id,"sᴄʜᴇᴅᴜʟᴇᴅ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ɴᴏᴛ ᴇɴᴀʙʟᴇᴅ ʏᴇᴛ. ᴜsᴇ ᴛᴇxᴛ ᴏʀ ᴍᴇᴅɪᴀ ʙʀᴏᴀᴅᴄᴀsᴛ ғᴏʀ ɪᴍᴍᴇᴅɪᴀᴛᴇ ᴅᴇʟɪᴠᴇʀʏ.")
         else:
             context.user_data["broadcast_mode"]=data.split(":")[1]
             await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀsᴛ. ᴛʜɪs ᴡɪʟʟ ɢᴏ ᴛᴏ ᴀʟʟ ᴜsᴇʀs ᴡʜᴏ sᴛᴀʀᴛᴇᴅ ᴀ ᴄʟᴏɴᴇ.")
@@ -366,7 +378,8 @@ async def capture_user_action(update,context):
         banned=action=="block"
         await db.require().execute("""INSERT INTO bot_users(clone_id,user_id,is_banned) VALUES($1,$2,$3)
             ON CONFLICT(clone_id,user_id) DO UPDATE SET is_banned=EXCLUDED.is_banned""",clone_id,target,banned)
-        await _send(context,update.effective_chat.id,f"ᴜsᴇʀ {target} ʜᴀs ʙᴇᴇɴ {action}ᴇᴅ.")
+        result_word="ʙʟᴏᴄᴋᴇᴅ" if banned else "ᴜɴʙʟᴏᴄᴋᴇᴅ"
+        await _send(context,update.effective_chat.id,f"ᴜsᴇʀ {target} ʜᴀs ʙᴇᴇɴ {result_word}.")
     else:
         rows=await db.require().fetch("SELECT clone_id,first_seen,last_seen,is_banned FROM bot_users WHERE user_id=$1 ORDER BY last_seen DESC LIMIT 20",target)
         if not rows:
