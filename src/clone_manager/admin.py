@@ -185,11 +185,32 @@ async def editsetting_callback(update,context):
     elif action=="preview":
         value=pending.get("draft",pending["value"])
         if pending["key"]=="branding.image_url":
-            await context.bot.send_photo(q.message.chat_id,photo=value,caption="ɪᴍᴀɢᴇ ᴘʀᴇᴠɪᴇᴡ")
-        else: await _send(context,q.message.chat_id,value)
+            try:
+                await context.bot.send_photo(q.message.chat_id,photo=value,caption="ɪᴍᴀɢᴇ ᴘʀᴇᴠɪᴇᴡ")
+                pending["previewed"]=True
+            except Exception:
+                pending["previewed"]=False
+                await q.answer("Image URL could not be loaded by Telegram. The current image is unchanged.",show_alert=True)
+                return
+        elif pending["key"]=="branding.buttons_json":
+            try:
+                from .branding import keyboard_from_buttons
+                markup=keyboard_from_buttons(json.loads(value),small_caps=True)
+                if not markup: raise ValueError("empty layout")
+                await _send(context,q.message.chat_id,"ʙᴜᴛᴛᴏɴ ʟᴀʏᴏᴜᴛ ᴘʀᴇᴠɪᴇᴡ",markup)
+                pending["previewed"]=True
+            except Exception:
+                pending["previewed"]=False
+                await q.answer("Invalid button layout JSON.",show_alert=True)
+                return
+        else:
+            await _send(context,q.message.chat_id,value)
+            pending["previewed"]=True
     elif action=="save":
         if "draft" not in pending:
             await q.answer("No new value to save.",show_alert=True); return
+        if pending["key"] in {"branding.image_url","branding.buttons_json"} and not pending.get("previewed"):
+            await q.answer("Preview the new value successfully before saving.",show_alert=True); return
         value=pending["draft"]
         if pending["key"]=="branding.buttons_json":
             try:
