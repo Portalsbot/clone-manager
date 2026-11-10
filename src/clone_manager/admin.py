@@ -154,7 +154,17 @@ async def ping(update,context):
 async def _edit_command(update,context,command):
     if not await _owner_admin(update,context): return
     key,label=EDITABLE[command]
-    current=await context.application.bot_data["db"].get_setting(key, FOOTER_DEFAULT if command=="setfooter" else (_image(context) if command=="setimage" else MENU_TEXT.get(command,"")))
+    defaults={
+        "message.start":"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {usermention} ~ (Quote end)\\n\\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)",
+        "message.about":MENU_TEXT["about"],
+        "message.help":MENU_TEXT["help"],
+        "branding.image_url":_image(context),
+        "branding.footer":FOOTER_DEFAULT,
+        "branding.name":(await context.bot.get_me()).first_name,
+        "branding.quote_enabled":"on",
+        "branding.buttons_json":json.dumps([[{"text":"· ᴀʙᴏᴜᴛ ·","callback_data":"admin:about"},{"text":"· ᴄʜᴀɴɴᴇʟ ·","callback_data":"admin:channel"}],[{"text":"· ᴄᴏᴍᴍᴀɴᴅs ·","callback_data":"admin:commands"}]],ensure_ascii=False),
+    }
+    current=await context.application.bot_data["db"].get_setting(key,defaults.get(key,MENU_TEXT.get(command,"")))
     context.user_data["pending_setting"]={"key":key,"value":current,"command":command}
     await _send(context,update.effective_chat.id,MENU_TEXT[command],_edit_markup("editsetting"))
 async def _save_input(update,context):
