@@ -52,3 +52,13 @@ class DockerProvisioner:
 
     async def restart(self,container_id:str):
         self.client.containers.get(container_id).restart(timeout=15)
+
+    async def status(self, container_id: str) -> str:
+        """Return the current Docker state; unknown is never reported as stopped."""
+        try:
+            container=self.client.containers.get(container_id)
+            container.reload()
+            state=(container.attrs.get("State") or {}).get("Status","unknown")
+            return "running" if state=="running" else "stopped" if state in {"exited","created","dead"} else "unknown"
+        except Exception:
+            return "unknown"

@@ -18,7 +18,8 @@ async def texts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_branded(context.bot, update.effective_chat.id, listing,
                        image_url=context.application.bot_data["image_url"],
                        image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"])
+                       small_caps=context.application.bot_data["small_caps"],
+                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def edittext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):

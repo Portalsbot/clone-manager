@@ -1,1 +1,6 @@
-DEFAULT_MESSAGES = {'cloner.start': 'ᴡᴇʟᴄᴏᴍᴇ! ᴜsᴇ /clone ᴛᴏ ᴄʀᴇᴀᴛᴇ ᴀ ғɪʟᴇ sʜᴀʀɪɴɢ ᴏʀ ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛ.', 'cloner.select': 'sᴇʟᴇᴄᴛ ᴡʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʟᴏɴᴇ.', 'cloner.token': 'sᴇɴᴅ ʏᴏᴜʀ ʙᴏᴛғᴀᴛʜᴇʀ ᴛᴏᴋᴇɴ. ɪᴛ ᴡɪʟʟ ʙᴇ ᴠᴀʟɪᴅᴀᴛᴇᴅ ᴀɴᴅ ᴇɴᴄʀʏᴘᴛᴇᴅ.', 'cloner.success': '✅ ʏᴏᴜʀ ᴄʟᴏɴᴇ ɪs ᴅᴇᴘʟᴏʏᴇᴅ: @{username}'}
+DEFAULT_MESSAGES = {
+    "cloner.start": "ᴡᴇʟᴄᴏᴍᴇ! ᴜsᴇ /clone ᴛᴏ ᴄʀᴇᴀᴛᴇ ᴀ ғɪʟᴇ sʜᴀʀɪɴɢ ᴏʀ ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛ.",
+    "cloner.select": "(Quote start) ᴄʜᴏᴏsᴇ ᴛʜᴇ ʙᴏᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʟᴏɴᴇ Boss. (Quote end)",
+    "cloner.token": "sᴇɴᴅ ᴏɴʟʏ ʏᴏᴜʀ ʙᴏᴛғᴀᴛʜᴇʀ ᴛᴏᴋᴇɴ.",
+    "cloner.success": "ᴄʟᴏɴᴇ ᴅᴇᴘʟᴏʏᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ: @{username}",
+}

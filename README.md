@@ -1,71 +1,34 @@
-# Private Clone Manager — project foundation
+# Private Clone Manager
 
-This repository manages two independently versioned private bot products: File Sharing Bot and Link Sharing Bot. It is **not a public cloning service**. The current scaffold includes `/clone` with two product buttons, BotFather token validation via Telegram `getMe`, best-effort deletion of the incoming token message, Fernet encryption at rest in PostgreSQL, Docker provisioning adapter, clone listing, stop/restart commands, and common message/button editing.
+A private Telegram control bot for provisioning and managing the separate File Sharing Bot and Link Sharing Bot projects.
 
-## Branding
+## Core behaviour
+- `/start` is available to everyone and displays the branded welcome menu.
+- All management commands are restricted to the configured owner and admins.
+- `/clone` asks for only a BotFather token, validates it with Telegram, deletes the submitted token message on a best-effort basis, encrypts the token at rest, and asks the Docker provisioner to launch the configured private image.
+- `/clones` lists registered clones; `/cloneinfo` shows details; `/stopclone` and `/restartclone` accept a clone ID.
+- Messages use the configured image, small-capital rendering, optional footer and a locked `· ᴄʟᴏsᴇ ·` control. The old dummy URL button has been removed.
+- Quote markers `(Quote start)` and `(Quote end)` render as Telegram blockquotes.
 
-All bot-authored text replies are photo-caption messages using `https://raw.githubusercontent.com/Portalsbot/image/main/photo_2026-11-01_20-42-48.jpg` (original user-supplied page: `https://github.com/Portalsbot/image/blob/main/photo_2026-11-01_20-42-48.jpg`). Verify that the raw image is publicly fetchable by Telegram. The ZIP does not contain the image binary. Long text is split into branded photo captions; Telegram media-delivery messages remain separate media messages.
+## Required environment
+- `BOT_TOKEN`
+- `DATABASE_URL`
+- `OWNER_ID`
+- `ADMIN_IDS` (optional, comma- or space-separated numeric Telegram IDs)
+- `TOKEN_ENCRYPTION_KEY`
+- `FILE_SHARING_IMAGE` and `LINK_SHARING_IMAGE`
+- `GHCR_USERNAME` and `GHCR_TOKEN` if the images are private in GHCR
 
-## What `/clone` does
-
-1. Displays File Sharing Bot and Link Sharing Bot buttons.
-2. Asks only for the selected bot's BotFather token.
-3. Validates the token using Telegram `getMe`.
-4. Deletes the token message on a best-effort basis and never logs the plaintext token.
-5. Encrypts the token for database storage.
-6. Pulls the configured private GHCR image and starts an isolated container.
-7. Reports the resulting bot username or a deployment failure.
-
-## Private image access
-
-Create a GitHub fine-grained credential/PAT with only the permissions required to read packages (`read:packages`) and configure `GHCR_USERNAME` / `GHCR_TOKEN`. GitHub App installation tokens can read repository contents, but GHCR private package pulls require a registry-compatible credential; do not assume repository App tokens authenticate GHCR. Use immutable image digests in production rather than `stable` tags.
+The owner is always included in the management allow-list. Admin IDs are separate from the owner ID. `ALLOWED_USER_IDS` can be used as an additional allow-list for migration compatibility.
 
 ## Run locally
-
 ```bash
 python -m venv .venv
 pip install -e .[dev]
 cp .env.example .env
 python scripts/generate_fernet_key.py
-# Put the generated key in TOKEN_ENCRYPTION_KEY and configure all remaining variables.
 python -m clone_manager.main
 ```
 
-The Docker SDK needs access to a Docker daemon. `docker-compose.yml` mounts the host Docker socket; this is highly privileged (effectively host-root access). Keep the manager private, secure the host, restrict who can use `/clone`, and never expose the Docker socket publicly.
-
-## Important security note
-
-The provisioner writes a per-clone JSON configuration file containing plaintext runtime secrets to `CLONE_SECRET_DIR`, restricts directories to mode 0700 and files to mode 0600, then mounts the file read-only into the clone container. The host secret directory must be on encrypted, root-controlled storage with backups/access restricted. Docker administrators can still access container files and mounted secrets. For higher assurance, migrate to Docker Swarm/Kubernetes secrets or a dedicated secret manager.
-
-## Commands
-
-| Command | Use |
-|---|---|
-| `/start` | Start private manager |
-| `/clone` | Choose a product and submit one BotFather token |
-| `/clones` | List your registered clone instances |
-| `/stopclone CLONE_ID` | Stop an owned clone |
-| `/restartclone CLONE_ID` | Restart an owned clone |
-| `/cloneedit CLONE_ID TEMPLATE_KEY` | Platform-owner: edit any existing clone's text |
-| `/clonepreview CLONE_ID TEMPLATE_KEY` | Platform-owner: preview an existing clone's text |
-| `/clonebuttonadd CLONE_ID | KEY | LABEL | URL` | Platform-owner: add a button to a clone |
-| `/clonebuttonedit CLONE_ID | KEY | INDEX | LABEL | URL` | Platform-owner: edit a clone button |
-| `/clonebuttondel CLONE_ID | KEY | INDEX` | Platform-owner: delete a clone button |
-| `/texts`, `/edittext`, `/previewtext`, `/resettext` | Manage manager messages |
-| `/buttons`, `/addbutton`, `/delbutton` | Manage manager inline buttons |
-
-## Master application configuration contract
-
-The current provisioner passes `CONFIG_FILE=/run/secrets/app-config.json` and expects the master bot images to read `BOT_TOKEN`, `DATABASE_URL`, `CLONE_ID`, `OWNER_ID`, `BRANDING_IMAGE_URL` and `SMALL_CAPS` from that JSON file. Each master repository must implement this contract before the images are compatible. The provisioner writes the actual requesting Telegram owner's ID into the clone config. Clone owner permissions must still be validated with live multi-clone tests.
-
-## Production gates not yet complete
-
-- GitHub App installation/selected-repository integration is designed but not implemented in this ZIP.
-- Private GHCR image publishing workflows are not created here; each master repository must build and publish its own image.
-- The two master images must implement the exact `CONFIG_FILE` contract.
-- Clone owner ID must be added to provisioning config.
-- Platform-owner remote text/button overrides are stored in the shared PostgreSQL template tables using `/cloneedit`, `/clonepreview` and `/clonebutton*`. All clone instances must use the same compatible database schema and `CLONE_ID` values.
-- Container health checks, quotas, cleanup/retry, updates/rollback, durable job queue, per-user clone limits and clone billing are not yet implemented.
-- Central file-storage relay must be validated independently; see the File Sharing Bot README.
-
-The manager intentionally reports provisioning failures instead of claiming success when Docker, GHCR credentials or image configuration is missing.
+## Operational notes
+The Docker socket grants powerful host access. Keep this bot private, restrict administrators, protect the host and secret directory, and never log plaintext BotFather tokens. The current hosting and deployment controls depend on the Docker daemon and image configuration being available.

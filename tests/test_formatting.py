@@ -12,3 +12,10 @@ def test_code_is_not_small_caps():
 def test_unsafe_link_is_not_rendered_as_anchor():
     output = render_text('(LINK url="javascript:alert(1)")click(/LINK)')
     assert '<a href=' not in output
+
+
+def test_named_quote_markers_render_as_telegram_blockquote():
+    output = render_text("(Quote start)Hello(Quote end)", small_caps=True)
+    assert "<blockquote>" in output
+    assert "</blockquote>" in output
+    assert "ʜᴇʟʟᴏ" in output
