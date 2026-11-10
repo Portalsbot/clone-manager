@@ -1,14 +1,53 @@
 # Private Clone Manager
 
-A private Telegram control bot for provisioning and managing the separate File Sharing Bot and Link Sharing Bot projects.
+Private Telegram control bot for provisioning and managing the separate File Sharing Bot and Link Sharing Bot projects.
 
-## Core behaviour
-- `/start` is available to everyone and displays the branded welcome menu.
-- All management commands are restricted to the configured owner and admins.
-- `/clone` asks for only a BotFather token, validates it with Telegram, deletes the submitted token message on a best-effort basis, encrypts the token at rest, and asks the Docker provisioner to launch the configured private image.
-- `/clones` lists registered clones; `/cloneinfo` shows details; `/stopclone` and `/restartclone` accept a clone ID.
-- Messages use the configured image, small-capital rendering, optional footer and a locked `· ᴄʟᴏsᴇ ·` control. The old dummy URL button has been removed.
-- Quote markers `(Quote start)` and `(Quote end)` render as Telegram blockquotes.
+## Access rules
+- `/start` is available to all users.
+- Owner and IDs listed in `ADMIN_IDS` can use management commands.
+- Non-admin users receive a private-bot warning when they run other commands.
+- Maintenance mode suppresses all non-owner command responses.
+- The manager records users who start it and supports user block/unblock controls.
+
+## Registered command list
+| Command | Purpose |
+|---|---|
+| `/start` | Welcome menu |
+| `/clone` | Choose File Sharing Bot or Link Sharing Bot; asks only for BotFather token |
+| `/about` | Bot information |
+| `/help` | Help menu |
+| `/commands` | Owner/Admin command list |
+| `/settings` | Settings dashboard |
+| `/broadcast` | Immediate text/media broadcast and report |
+| `/users` | User lookup, info, block/unblock, activity |
+| `/stats` | User, clone, period and system-health statistics |
+| `/logs` | User, clone, broadcast, error and admin activity logs |
+| `/ping` | Measured response latency |
+| `/restart` | Restart and role-aware stop controls |
+| `/maintenance` | Enable, disable and inspect maintenance mode |
+| `/setmaintenance` | Maintenance notice |
+| `/setstart` | Edit the welcome message |
+| `/setabout` | Edit the About message |
+| `/sethelp` | Edit the Help message |
+| `/setimage` | Change the global message image URL |
+| `/setbuttons` | Edit the Start/Help inline-button layout using JSON |
+| `/setfooter` | Edit the linked footer |
+| `/setquote` | Enable/disable Quote start/Quote end conversion |
+| `/setname` | Change the Telegram bot display name |
+| `/clones` | Clone dashboard with live Docker status |
+| `/stopclone` | Select and stop a clone |
+| `/restartclone` | Select and restart a clone |
+| `/cloneedit` | Edit a clone-specific message override |
+| `/cloneinfo` | View clone details |
+| `/texts` | Browse editable manager and clone messages |
+| `/edittext` | Edit a selected message |
+
+## Branding
+Every bot-authored response is sent with the configured image, small-capital text, optional linked footer and a locked `· ᴄʟᴏsᴇ ·` button. The dummy URL button is removed. `(Quote start)` and `(Quote end)` are converted to Telegram blockquotes when quote formatting is enabled.
+
+Default image: `https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png`
+
+Default footer: `(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)`
 
 ## Required environment
 - `BOT_TOKEN`
@@ -19,7 +58,7 @@ A private Telegram control bot for provisioning and managing the separate File S
 - `FILE_SHARING_IMAGE` and `LINK_SHARING_IMAGE`
 - `GHCR_USERNAME` and `GHCR_TOKEN` if the images are private in GHCR
 
-The owner is always included in the management allow-list. Admin IDs are separate from the owner ID. `ALLOWED_USER_IDS` can be used as an additional allow-list for migration compatibility.
+The owner is always included in the management allow-list. Admin IDs are separate from the owner ID. `ALLOWED_USER_IDS` remains supported as an additional allow-list for migration compatibility.
 
 ## Run locally
 ```bash
@@ -30,5 +69,9 @@ python scripts/generate_fernet_key.py
 python -m clone_manager.main
 ```
 
-## Operational notes
-The Docker socket grants powerful host access. Keep this bot private, restrict administrators, protect the host and secret directory, and never log plaintext BotFather tokens. The current hosting and deployment controls depend on the Docker daemon and image configuration being available.
+## Current implementation boundaries
+- Broadcast scheduling is shown as a menu item but is not yet implemented; text and media broadcasts are immediate.
+- `/cloneedit` currently edits clone-specific message overrides; editing repository, hosting or encrypted token settings is not implemented.
+- Clone provisioning requires a working Docker daemon, configured private images and GHCR credentials when applicable.
+
+The Docker socket is highly privileged. Keep this bot private, restrict administrators, protect the host and secret directory, and never log plaintext BotFather tokens.
