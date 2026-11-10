@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 import time
+import asyncio
+import os
+import sys
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -275,7 +278,37 @@ async def capture_broadcast(update,context):
     await _send(context,update.effective_chat.id,f"ʙʀᴏᴀᴅᴄᴀsᴛ ғɪɴɪsʜᴇᴅ. sᴇɴᴛ: {sent} · ғᴀɪʟᴇᴅ: {failed}")
 async def restart(update,context):
     if not await _owner_admin(update,context): return
-    await _send(context,update.effective_chat.id,"ʀᴇsᴛᴀʀᴛ ʀᴇǫᴜᴇsᴛ ʀᴇᴄᴇɪᴠᴇᴅ. ᴜsᴇ ʏᴏᴜʀ ʜᴏsᴛɪɴɢ ᴘʟᴀᴛғᴏʀᴍ's ʀᴇᴅᴇᴘʟᴏʏ / ʀᴇsᴛᴀʀᴛ ᴄᴏɴᴛʀᴏʟ ᴛᴏ ᴀᴠᴏɪᴅ ᴀɴ ᴜɴᴘʟᴀɴɴᴇᴅ sʜᴜᴛᴅᴏᴡɴ.")
+    markup=_markup([[("· ʀᴇsᴛᴀʀᴛ ᴀɢᴀɪɴ ·","restart:again"),("· sᴛᴏᴘ ·","restart:stop")]])
+    await _send(context,update.effective_chat.id,"ʀᴇsᴛᴀʀᴛɪɴɢ ʙᴏᴛ, sᴇɴᴘᴀɪ...",markup)
+
+async def restart_callback(update,context):
+    q=update.callback_query
+    if not _is_admin(q.from_user.id,context):
+        await q.answer("Owner / Admin only.",show_alert=True); return
+    await q.answer()
+    action=q.data.split(":")[1]
+    if action=="again":
+        await _send(context,q.message.chat_id,"ʙᴏᴛ ɪs ʀᴇsᴛᴀʀᴛɪɴɢ ɴᴏᴡ...")
+        await asyncio.sleep(1)
+        os.execv(sys.executable,[sys.executable,*sys.argv])
+    db=context.application.bot_data["db"]
+    who=q.from_user.first_name or str(q.from_user.id)
+    notice=f"ʙᴏᴛ sᴛᴏᴘᴘᴇᴅ ʙʏ {who} sᴏ, ʙᴇ ᴘᴀᴛɪᴇɴᴛ ᴀɴᴅ ᴡᴇ'ʟʟ ᴄᴏᴍᴇ ʙᴀᴄᴋ sᴏᴏɴ."
+    recipients=await db.require().fetch("SELECT DISTINCT user_id FROM bot_users")
+    for row in recipients:
+        try:
+            await send_branded(context.bot,row["user_id"],notice,image_url=_image(context),
+                image_path=context.application.bot_data.get("image_path"),
+                small_caps=context.application.bot_data.get("small_caps",True),
+                footer_message=await db.get_setting("branding.footer",FOOTER_DEFAULT))
+        except Exception:
+            pass
+    await _send(context,q.message.chat_id,"sᴛᴏᴘ ɴᴏᴛɪᴄᴇ ᴅᴇʟɪᴠᴇʀᴇᴅ.")
+    if _is_owner(q.from_user.id,context):
+        await asyncio.sleep(1)
+        os._exit(0)
+    await db.set_setting("system.maintenance","true")
+    await _send(context,q.message.chat_id,"ᴀᴅᴍɪɴ sᴛᴏᴘ ᴀᴄᴛɪᴠᴀᴛᴇᴅ. ᴛʜᴇ ʙᴏᴛ ɪs ɴᴏᴡ ʀᴇsᴛʀɪᴄᴛᴇᴅ ғᴏʀ ᴀᴅᴍɪɴs ᴀɴᴅ ᴜsᴇʀs; ᴏᴡɴᴇʀ ᴀᴄᴄᴇss ʀᴇᴍᴀɪɴs.")
 async def _register_edit(update,context,command):
     await _edit_command(update,context,command)
 async def command_access_gate(update,context):
@@ -301,6 +334,7 @@ def add_admin_handlers(app):
         async def handler(update,context,n=name): await _register_edit(update,context,n)
         app.add_handler(CommandHandler(name,handler))
     app.add_handler(CallbackQueryHandler(callback_router,pattern=r"^(admin:|maintenance:|stats:|users:|broadcast:|logs:)"))
+    app.add_handler(CallbackQueryHandler(restart_callback,pattern=r"^restart:(again|stop)$"))
     app.add_handler(CallbackQueryHandler(editsetting_callback,pattern=r"^editsetting:"))
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, capture_broadcast),group=-4)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _save_input),group=-3)
