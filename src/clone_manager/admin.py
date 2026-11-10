@@ -279,11 +279,11 @@ async def command_access_gate(update,context):
     user=update.effective_user
     if not user or not update.effective_message: return
     command=(update.effective_message.text or "").split()[0].split("@",1)[0].lower()
-    if command=="/start": return
     if _is_owner(user.id,context): return
     if await context.application.bot_data["db"].get_setting("system.maintenance","false")=="true":
         from telegram.ext import ApplicationHandlerStop
         raise ApplicationHandlerStop
+    if command=="/start": return
     if not _is_admin(user.id,context):
         await _send(context,update.effective_chat.id,"ᴘʟᴇᴀsᴇ ᴜsᴇ /start ᴏɴʟʏ. ᴛʜɪs ʙᴏᴛ ɪs ᴘʀɪᴠᴀᴛᴇ.")
         from telegram.ext import ApplicationHandlerStop
