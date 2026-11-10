@@ -72,7 +72,8 @@ async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
     pending_edit=context.user_data.get("pending_clone_edit")
     if pending_edit:
         await _capture_clone_edit(update,context,pending_edit)
-        return
+        from telegram.ext import ApplicationHandlerStop
+        raise ApplicationHandlerStop
     product=context.user_data.get("pending_clone_product")
     if not product or not update.effective_message or not update.effective_message.text: return
     if not _allowed(update.effective_user.id,context):
@@ -285,6 +286,10 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await _send(update,context,"(Quote start) ᴏᴏʜ~! ᴡᴀɴᴛ ᴛᴏ ᴋɴᴏᴡ ᴇᴠᴇʀʏᴛʜɪɴɢ ᴀʙᴏᴜᴛ ᴏɴᴇ ᴏғ ʏᴏᴜʀ ʟɪᴛᴛʟᴇ ʙᴏᴛs, sᴇɴᴘᴀɪ? 🎀\\n\\nᴄʜᴏᴏsᴇ ᴀ ᴄʟᴏɴᴇ ᴀɴᴅ ɪ'ʟʟ sʜᴏᴡ ʏᴏᴜ ɪᴛs ᴅᴇᴛᴀɪʟs! ♡ (Quote end)",InlineKeyboardMarkup(keyboard))
 
 async def clonedit(update:Update,context:ContextTypes.DEFAULT_TYPE):
+    for state in ("pending_clone_edit","pending_clone_product","editing_text_key","editing_clone_id",
+                  "pending_setting","pending_text_editor","awaiting_text_draft","user_action",
+                  "broadcast_mode","pending_broadcast","awaiting_broadcast_time"):
+        context.user_data.pop(state,None)
     if not _allowed(update.effective_user.id,context):
         await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ."); return
     db=context.application.bot_data["db"]
@@ -351,6 +356,10 @@ def _parse_repository(value:str)->tuple[str|None,str]:
 
 
 async def _start_clone_edit(update,context,clone_id,field):
+    for state in ("pending_setting","pending_text_editor","awaiting_text_draft","user_action",
+                  "broadcast_mode","pending_broadcast","awaiting_broadcast_time","pending_clone_product",
+                  "editing_text_key","editing_clone_id"):
+        context.user_data.pop(state,None)
     db=context.application.bot_data["db"]
     row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
     if not row: await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return

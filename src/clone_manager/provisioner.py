@@ -72,12 +72,18 @@ class DockerProvisioner:
         image=self._image(product,image_ref); self._pull(image)
         path=self._config_file(clone_id,token,owner_id,extra_environment)
         name=f"tg-{self._safe(clone_id)}"
-        old=self.client.containers.get(current_id) if current_id else None
+        old=None
+        if current_id:
+            try:
+                old=self.client.containers.get(current_id)
+            except docker.errors.NotFound:
+                old=None
         backup=f"{name}-backup-{secrets.token_hex(3)}"
         new=None
-        if old:
-            old.stop(timeout=20); old.rename(backup)
         try:
+            if old:
+                old.stop(timeout=20)
+                old.rename(backup)
             new=self._run(image,product,clone_id,path,network,restart_policy)
             new_id=new.id
             if old: old.remove(force=True)
@@ -89,8 +95,14 @@ class DockerProvisioner:
                 try: new.remove(force=True)
                 except Exception: pass
             if old:
-                try: old.rename(name); old.start()
-                except Exception: pass
+                try:
+                    old.reload()
+                    if old.name != name:
+                        old.rename(name)
+                    if old.status != "running":
+                        old.start()
+                except Exception:
+                    pass
             path.unlink(missing_ok=True)
             raise
 

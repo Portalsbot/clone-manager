@@ -185,9 +185,12 @@ async def _save_input(update,context):
         p=urlparse(value)
         if p.scheme not in {"http","https"} or not p.netloc:
             await _send(context,update.effective_chat.id,"ɪɴᴠᴀʟɪᴅ ɪᴍᴀɢᴇ ᴜʀʟ. ᴏʟᴅ ɪᴍᴀɢᴇ ʀᴇᴍᴀɪɴs ᴜɴᴄʜᴀɴɢᴇᴅ.")
-            return
+            from telegram.ext import ApplicationHandlerStop
+            raise ApplicationHandlerStop
     pending["draft"]=value
     await _send(context,update.effective_chat.id,"ᴅʀᴀғᴛ ʀᴇᴄᴇɪᴠᴇᴅ. ᴘʀᴇᴠɪᴇᴡ ɪᴛ ᴏʀ sᴀᴠᴇ ᴛᴏ ᴀᴘᴘʟʏ.",_edit_markup("editsetting", {"setimage":"· ᴄʜᴀɴɢᴇ ɪᴍᴀɢᴇ ·","setfooter":"· ᴇᴅɪᴛ ғᴏᴏᴛᴇʀ ·","setname":"· ᴇᴅɪᴛ ɴᴀᴍᴇ ·","setquote":"· ᴇᴅɪᴛ ǫᴜᴏᴛᴇ ·","setbuttons":"· ᴇᴅɪᴛ ʙᴜᴛᴛᴏɴs ·"}.get(pending.get("command"), "· ᴇᴅɪᴛ ᴛᴇxᴛ ·")))
+    from telegram.ext import ApplicationHandlerStop
+    raise ApplicationHandlerStop
 async def editsetting_callback(update,context):
     q=update.callback_query; await q.answer()
     pending=context.user_data.get("pending_setting")
@@ -327,14 +330,6 @@ async def callback_router(update,context):
             await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴜsᴇʀ ɪᴅ.")
         else:
             await _send(context,q.message.chat_id,"ᴜsᴇʀ ᴀᴄᴛɪᴏɴ ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ.")
-    elif data.startswith("broadcast:"):
-        if data=="broadcast:report":
-            rows=await context.application.bot_data["db"].require().fetch("SELECT created_at,details FROM manager_activity WHERE action='broadcast' ORDER BY created_at DESC LIMIT 10")
-            report="ʙʀᴏᴀᴅᴄᴀsᴛ ʜɪsᴛᴏʀʏ\\n\\n"+("\\n".join(f"{r['created_at']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴄᴏʀᴅs.")
-            await _send(context,q.message.chat_id,report)
-        from .broadcasts import broadcast_callback
-        await broadcast_callback(update,context)
-        return
     elif data.startswith("logs:"):
         action=data.split(":")[1]
         db=context.application.bot_data["db"]
@@ -399,7 +394,8 @@ async def capture_user_action(update,context):
     try: target=int(update.effective_message.text.strip())
     except ValueError:
         await _send(context,update.effective_chat.id,"ɪɴᴠᴀʟɪᴅ ᴜsᴇʀ ɪᴅ. ᴜsᴇ ɴᴜᴍᴇʀɪᴄ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅ.")
-        return
+        from telegram.ext import ApplicationHandlerStop
+        raise ApplicationHandlerStop
     db=context.application.bot_data["db"]
     clone_id=context.application.bot_data["clone_id"]
     if action in {"block","unblock"}:
@@ -422,6 +418,8 @@ async def capture_user_action(update,context):
         else:
             body=f"ᴜsᴇʀ ɪᴅ: {target}\\n" + "\\n".join(f"{r['clone_id']} · first: {r['first_seen']} · last: {r['last_seen']} · blocked: {r['is_banned']}" for r in rows)
             await _send(context,update.effective_chat.id,body)
+    from telegram.ext import ApplicationHandlerStop
+    raise ApplicationHandlerStop
 
 async def command_access_gate(update,context):
     user=update.effective_user

@@ -58,7 +58,7 @@ Default footer: `(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ �
 - `FILE_SHARING_IMAGE` and `LINK_SHARING_IMAGE`
 - `GHCR_USERNAME` and `GHCR_TOKEN` if the images are private in GHCR
 
-The owner is always included in the management allow-list. Admin IDs are separate from the owner ID. `ALLOWED_USER_IDS` remains supported as an additional allow-list for migration compatibility.
+The owner is always included in the management allow-list. Admin IDs are separate from the owner ID. Only the configured owner and `ADMIN_IDS` receive management access.
 
 ## Run locally
 ```bash
