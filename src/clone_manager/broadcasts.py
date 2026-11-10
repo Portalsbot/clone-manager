@@ -43,7 +43,7 @@ def parse_scheduled_at(value: str, *, now: datetime | None = None) -> datetime:
 
 def serialize_message(message) -> dict:
     buttons = []
-    if message.reply_markup and getattr(message.reply_markup, "inline_keyboard", None):
+    if getattr(message, "reply_markup", None) and getattr(message.reply_markup, "inline_keyboard", None):
         for row in message.reply_markup.inline_keyboard:
             safe = [{"text": button.text, "url": button.url} for button in row
                     if button.url and button.url.startswith(("https://", "http://"))]
