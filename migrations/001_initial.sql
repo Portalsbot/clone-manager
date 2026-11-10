@@ -21,3 +21,13 @@ CREATE INDEX IF NOT EXISTS idx_clone_owner ON clone_instances(owner_id, created_
 CREATE TABLE IF NOT EXISTS bot_settings (
     setting_key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS manager_activity (
+    id BIGSERIAL PRIMARY KEY,
+    actor_id BIGINT,
+    action TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '',
+    level TEXT NOT NULL DEFAULT 'info',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_manager_activity_created ON manager_activity(created_at DESC);

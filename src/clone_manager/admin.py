@@ -243,7 +243,19 @@ async def callback_router(update,context):
             sql="SELECT COUNT(*) FROM clone_instances"+(" WHERE product=$1" if action in {"file","link"} else "")
             value=await db.require().fetchval(sql,action) if action in {"file","link"} else await db.require().fetchval(sql)
             body=f"{action.title()} clones: {value}"
-        else: body="ᴜᴘᴛɪᴍᴇ ᴀɴᴅ ᴘᴇʀɪᴏᴅ sᴛᴀᴛs ʀᴇǫᴜɪʀᴇ ᴛʜᴇ ᴘʀᴏᴅᴜᴄᴛɪᴏɴ ᴍᴇᴛʀɪᴄs ᴄᴏɴɴᴇᴄᴛᴏʀ."
+        elif action=="period":
+            day=await db.require().fetchval("SELECT COUNT(*) FROM clone_instances WHERE created_at>NOW()-INTERVAL '1 day'")
+            week=await db.require().fetchval("SELECT COUNT(*) FROM clone_instances WHERE created_at>NOW()-INTERVAL '7 days'")
+            month=await db.require().fetchval("SELECT COUNT(*) FROM clone_instances WHERE created_at>NOW()-INTERVAL '30 days'")
+            body=f"ᴄʟᴏɴᴇs ᴄʀᴇᴀᴛᴇᴅ\\nᴅᴀɪʟʏ: {day}\\nᴡᴇᴇᴋʟʏ: {week}\\nᴍᴏɴᴛʜʟʏ: {month}"
+        elif action=="health":
+            try:
+                context.application.bot_data["db"].require()
+                context.application.bot_data["provisioner"].client.ping()
+                body="ᴅᴀᴛᴀʙᴀsᴇ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\\nᴅᴏᴄᴋᴇʀ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\\nᴍᴀɴᴀɢᴇʀ: ᴏɴʟɪɴᴇ"
+            except Exception:
+                body="ᴅᴀᴛᴀʙᴀsᴇ / ᴅᴏᴄᴋᴇʀ ᴄᴏɴɴᴇᴄᴛɪᴏɴ ᴘʀᴏʙʟᴇᴍ."
+        else: body="ᴜɴᴋɴᴏᴡɴ sᴛᴀᴛs ᴄᴀᴛᴇɢᴏʀʏ."
         await _send(context,q.message.chat_id,body)
     elif data.startswith("users:"):
         action=data.split(":")[1]
@@ -265,7 +277,24 @@ async def callback_router(update,context):
             context.user_data["broadcast_mode"]=data.split(":")[1]
             await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀsᴛ. ᴛʜɪs ᴡɪʟʟ ɢᴏ ᴛᴏ ᴀʟʟ ᴜsᴇʀs ᴡʜᴏ sᴛᴀʀᴛᴇᴅ ᴀ ᴄʟᴏɴᴇ.")
     elif data.startswith("logs:"):
-        await _send(context,q.message.chat_id,"ʟᴏɢ ᴠɪᴇᴡɪɴɢ ɪs ɴᴏᴛ ʏᴇᴛ ᴡɪʀᴇᴅ ᴛᴏ ᴀ ᴘᴇʀsɪsᴛᴇɴᴛ ᴀᴄᴛɪᴠɪᴛʏ sᴛᴏʀᴇ.")
+        action=data.split(":")[1]
+        db=context.application.bot_data["db"]
+        if action=="clear":
+            markup=_markup([[("· ʏᴇs, ᴄʟᴇᴀʀ ·","logs:clear-confirm"),("· ᴄᴀɴᴄᴇʟ ·","admin:back")]])
+            await _send(context,q.message.chat_id,"ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʟᴇᴀʀ ᴀʟʟ ᴀᴄᴛɪᴠɪᴛʏ ʟᴏɢs?",markup)
+            return
+        if action=="clear-confirm":
+            await db.require().execute("DELETE FROM manager_activity")
+            await _send(context,q.message.chat_id,"ᴀᴄᴛɪᴠɪᴛʏ ʟᴏɢs ᴄʟᴇᴀʀᴇᴅ.")
+            return
+        mapping={"users":"user","clones":"clone","broadcast":"broadcast","errors":"error","admins":"admin"}
+        category=mapping.get(action)
+        if not category:
+            await _send(context,q.message.chat_id,"ᴜɴᴋɴᴏᴡɴ ʟᴏɢ ᴄᴀᴛᴇɢᴏʀʏ."); return
+        rows=await db.require().fetch("SELECT actor_id,action,details,level,created_at FROM manager_activity WHERE action ILIKE $1 ORDER BY created_at DESC LIMIT 25",f"%{category}%")
+        body="(Quote start) ʟᴀsᴛ 25 ʟᴏɢ ᴇɴᴛʀɪᴇs (Quote end)\\n\\n"
+        body+="\\n".join(f"{r['created_at']} · {r['action']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʟᴏɢ ᴇɴᴛʀɪᴇs ғᴏᴜɴᴅ."
+        await _send(context,q.message.chat_id,body)
 async def capture_broadcast(update,context):
     mode=context.user_data.pop("broadcast_mode",None)
     if not mode or not update.effective_message: return
@@ -286,6 +315,7 @@ async def capture_broadcast(update,context):
                     footer_message=await context.application.bot_data["db"].get_setting("branding.footer",FOOTER_DEFAULT))
             sent+=1
         except Exception: failed+=1
+    await context.application.bot_data["db"].require().execute("INSERT INTO manager_activity(actor_id,action,details,level) VALUES($1,$2,$3,$4)",update.effective_user.id,"broadcast","sent="+str(sent)+", failed="+str(failed),"info")
     await _send(context,update.effective_chat.id,f"ʙʀᴏᴀᴅᴄᴀsᴛ ғɪɴɪsʜᴇᴅ. sᴇɴᴛ: {sent} · ғᴀɪʟᴇᴅ: {failed}")
 async def restart(update,context):
     if not await _owner_admin(update,context): return
@@ -349,11 +379,15 @@ async def command_access_gate(update,context):
     user=update.effective_user
     if not user or not update.effective_message: return
     command=(update.effective_message.text or "").split()[0].split("@",1)[0].lower()
-    if _is_owner(user.id,context): return
+    if _is_owner(user.id,context): 
+        await context.application.bot_data["db"].require().execute("INSERT INTO manager_activity(actor_id,action,details) VALUES($1,$2,$3)",user.id,"admin_command",command)
+        return
     if await context.application.bot_data["db"].get_setting("system.maintenance","false")=="true":
         from telegram.ext import ApplicationHandlerStop
         raise ApplicationHandlerStop
     if command=="/start": return
+    if _is_admin(user.id,context):
+        await context.application.bot_data["db"].require().execute("INSERT INTO manager_activity(actor_id,action,details) VALUES($1,$2,$3)",user.id,"admin_command",command)
     if not _is_admin(user.id,context):
         await _send(context,update.effective_chat.id,"ᴘʟᴇᴀsᴇ ᴜsᴇ /start ᴏɴʟʏ. ᴛʜɪs ʙᴏᴛ ɪs ᴘʀɪᴠᴀᴛᴇ.")
         from telegram.ext import ApplicationHandlerStop
