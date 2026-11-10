@@ -42,7 +42,8 @@ def main():
         "small_caps":settings.small_caps,"defaults":DEFAULT_MESSAGES,"allowed_users":allowed,
         "encryption_key":encryption_key,"provisioner":DockerProvisioner()})
     app.add_handler(CallbackQueryHandler(close_branded_message,pattern=r"^branding:close$"),group=-10)
-    app.add_handler(MessageHandler(filters.COMMAND, command_access_gate), group=-100)\n    add_clone_handlers(app)
+    app.add_handler(MessageHandler(filters.COMMAND, command_access_gate), group=-100)
+    add_clone_handlers(app)
     add_editor_handlers(app)
     add_admin_handlers(app)
     app.add_error_handler(error_handler)
