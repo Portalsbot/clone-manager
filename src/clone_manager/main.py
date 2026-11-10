@@ -16,7 +16,11 @@ async def post_init(app):
     s=app.bot_data["settings"]
     db=Database(s.database_url)
     await db.connect()
-    for migration in sorted(Path("migrations").glob("*.sql")):
+    migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
+    migration_files = sorted(migrations_dir.glob("*.sql"))
+    if not migration_files:
+        raise RuntimeError(f"No database migrations found in {migrations_dir}")
+    for migration in migration_files:
         await db.init_schema(migration.read_text(encoding="utf-8"))
     # If a process stops mid-delivery, recipient-level outcomes are unknown.
     # Mark that job failed rather than replaying it and duplicating some recipients.
