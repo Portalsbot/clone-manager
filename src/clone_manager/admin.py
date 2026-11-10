@@ -17,7 +17,7 @@ from .formatting import render_text
 FOOTER_DEFAULT = '(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)'
 IMAGE_DEFAULT = "https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png"
 MENU_TEXT = {
-    "about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\\n\\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.\\n\\n◈ ᴏᴡɴᴇʀ: @Just_astha\\n◈ ᴅᴇᴠᴇʟᴏᴘᴇʀ: @Just_astha\\n◈ ʟᴀɴɢᴜᴀɢᴇ: Python\\n◈ ʟɪʙʀᴀʀʏ: python-telegram-bot\\n◈ ᴅᴀᴛᴀʙᴀsᴇ: PostgreSQL",
+    "about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\n\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.\n\n◈ ᴏᴡɴᴇʀ: @Just_astha\n◈ ᴅᴇᴠᴇʟᴏᴘᴇʀ: @Just_astha\n◈ ʟᴀɴɢᴜᴀɢᴇ: Python\n◈ ʟɪʙʀᴀʀʏ: python-telegram-bot\n◈ ᴅᴀᴛᴀʙᴀsᴇ: PostgreSQL",
     "help": "ʜᴇʏ {mention}! ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ: @Just_astha",
     "commands": "(Quote start) ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs (Quote end)\n\n/clone · /commands · /settings\n/about · /help · /broadcast · /users\n/stats · /logs · /ping · /restart\n/maintenance · /setmaintenance\n/setstart · /setabout · /sethelp\n/setimage · /setbuttons · /setfooter\n/setquote · /setname · /clones\n/stopclone · /restartclone · /clonedit\n/cloneinfo · /texts · /edittext",
     "settings": "╭───────────────⍟\n├➤ ʙᴏᴛ sᴇᴛᴛɪɴɢs\n├➤ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ʙᴏᴛ ᴘʀᴇғᴇʀᴇɴᴄᴇs ʙᴇʟᴏᴡ.\n╰───────────────⍟",
@@ -168,7 +168,7 @@ async def _edit_command(update,context,command):
         context.user_data.pop(state,None)
     key,label=EDITABLE[command]
     defaults={
-        "message.start":"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {usermention} ~ (Quote end)\\n\\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)",
+        "message.start":"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {usermention} ~ (Quote end)\n\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)",
         "message.about":MENU_TEXT["about"],
         "message.help":MENU_TEXT["help"],
         "branding.image_url":_image(context),
@@ -286,7 +286,7 @@ async def callback_router(update,context):
             body=await context.application.bot_data["db"].get_setting("message.about",MENU_TEXT["about"])
             await _send(context,q.message.chat_id,body.format(botname=me.first_name,owner=context.application.bot_data["owner_id"]))
         elif key=="channel":
-            body="(Quote start)\\n╭───────────────⍟\\n├➽ Dᴇᴠᴇʟᴏᴩᴇʀ : @Just_astha\\n├➽ Oᴡɴᴇʀ : @Just_astha\\n├➽ Aɴɪᴍᴇ Iɴᴅᴇx : @Master_Index\\n├➽ Fɪɴɪsʜᴇᴅ Aɴɪᴍᴇ : @anime_portals\\n├➽ Oɴɢᴏɪɴɢ Aɴɪᴍᴇ : @ongoing_portals\\n├➽ Mᴀɴʜᴡᴀ / Mᴀɴɢᴀ: @Manga_Portals\\n├➽ Nᴇᴛᴡᴏʀᴋ : @Anime_Gateway\\n├➽ Rᴇǫ/Cʜᴀᴛ : https://t.me/+lB05vD5bGyszMzg1\\n╰───────────────⍟\\n(Quote end)"
+            body="(Quote start)\n╭───────────────⍟\n├➽ Dᴇᴠᴇʟᴏᴩᴇʀ : @Just_astha\n├➽ Oᴡɴᴇʀ : @Just_astha\n├➽ Aɴɪᴍᴇ Iɴᴅᴇx : @Master_Index\n├➽ Fɪɴɪsʜᴇᴅ Aɴɪᴍᴇ : @anime_portals\n├➽ Oɴɢᴏɪɴɢ Aɴɪᴍᴇ : @ongoing_portals\n├➽ Mᴀɴʜᴡᴀ / Mᴀɴɢᴀ: @Manga_Portals\n├➽ Nᴇᴛᴡᴏʀᴋ : @Anime_Gateway\n├➽ Rᴇǫ/Cʜᴀᴛ : https://t.me/+lB05vD5bGyszMzg1\n╰───────────────⍟\n(Quote end)"
             await _send(context,q.message.chat_id,body)
         else: await _send(context,q.message.chat_id,f"{key.title()} settings",_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
     elif data.startswith("maintenance:"):
@@ -312,12 +312,12 @@ async def callback_router(update,context):
             day=await db.require().fetchval("SELECT COUNT(*) FROM clone_instances WHERE created_at>NOW()-INTERVAL '1 day'")
             week=await db.require().fetchval("SELECT COUNT(*) FROM clone_instances WHERE created_at>NOW()-INTERVAL '7 days'")
             month=await db.require().fetchval("SELECT COUNT(*) FROM clone_instances WHERE created_at>NOW()-INTERVAL '30 days'")
-            body=f"ᴄʟᴏɴᴇs ᴄʀᴇᴀᴛᴇᴅ\\nᴅᴀɪʟʏ: {day}\\nᴡᴇᴇᴋʟʏ: {week}\\nᴍᴏɴᴛʜʟʏ: {month}"
+            body=f"ᴄʟᴏɴᴇs ᴄʀᴇᴀᴛᴇᴅ\nᴅᴀɪʟʏ: {day}\nᴡᴇᴇᴋʟʏ: {week}\nᴍᴏɴᴛʜʟʏ: {month}"
         elif action=="health":
             try:
                 context.application.bot_data["db"].require()
                 await asyncio.to_thread(context.application.bot_data["provisioner"].client.ping)
-                body="ᴅᴀᴛᴀʙᴀsᴇ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\\nᴅᴏᴄᴋᴇʀ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\\nᴍᴀɴᴀɢᴇʀ: ᴏɴʟɪɴᴇ"
+                body="ᴅᴀᴛᴀʙᴀsᴇ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\nᴅᴏᴄᴋᴇʀ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\nᴍᴀɴᴀɢᴇʀ: ᴏɴʟɪɴᴇ"
             except Exception:
                 body="ᴅᴀᴛᴀʙᴀsᴇ / ᴅᴏᴄᴋᴇʀ ᴄᴏɴɴᴇᴄᴛɪᴏɴ ᴘʀᴏʙʟᴇᴍ."
         else: body="ᴜɴᴋɴᴏᴡɴ sᴛᴀᴛs ᴄᴀᴛᴇɢᴏʀʏ."
@@ -356,8 +356,8 @@ async def callback_router(update,context):
         if not category:
             await _send(context,q.message.chat_id,"ᴜɴᴋɴᴏᴡɴ ʟᴏɢ ᴄᴀᴛᴇɢᴏʀʏ."); return
         rows=await db.require().fetch("SELECT actor_id,action,details,level,created_at FROM manager_activity WHERE action ILIKE $1 ORDER BY created_at DESC LIMIT 25",f"%{category}%")
-        body="(Quote start) ʟᴀsᴛ 25 ʟᴏɢ ᴇɴᴛʀɪᴇs (Quote end)\\n\\n"
-        body+="\\n".join(f"{r['created_at']} · {r['action']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʟᴏɢ ᴇɴᴛʀɪᴇs ғᴏᴜɴᴅ."
+        body="(Quote start) ʟᴀsᴛ 25 ʟᴏɢ ᴇɴᴛʀɪᴇs (Quote end)\n\n"
+        body+="\n".join(f"{r['created_at']} · {r['action']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʟᴏɢ ᴇɴᴛʀɪᴇs ғᴏᴜɴᴅ."
         await _send(context,q.message.chat_id,body)
 async def capture_broadcast(update,context):
     from .broadcasts import capture_broadcast_message
@@ -426,7 +426,7 @@ async def capture_user_action(update,context):
         if not rows:
             await _send(context,update.effective_chat.id,"ɴᴏ ʀᴇᴄᴏʀᴅ ғᴏᴜɴᴅ ғᴏʀ ᴛʜɪs ᴜsᴇʀ.")
         else:
-            body=f"ᴜsᴇʀ ɪᴅ: {target}\\n" + "\\n".join(f"{r['clone_id']} · first: {r['first_seen']} · last: {r['last_seen']} · blocked: {r['is_banned']}" for r in rows)
+            body=f"ᴜsᴇʀ ɪᴅ: {target}\n" + "\n".join(f"{r['clone_id']} · first: {r['first_seen']} · last: {r['last_seen']} · blocked: {r['is_banned']}" for r in rows)
             await _send(context,update.effective_chat.id,body)
     from telegram.ext import ApplicationHandlerStop
     raise ApplicationHandlerStop
@@ -482,7 +482,7 @@ async def diagnostics(update, context):
     except Exception as exc:
         results.append(f"Clone secret directory: FAILED ({type(exc).__name__}; set CLONE_SECRET_DIR to a writable host path)")
     results.append("Docker host note: clone containers and mounted secret files must use the same Docker host filesystem.")
-    await _send(update, context, "**ᴄʟᴏɴᴇ ᴍᴀɴᴀɢᴇʀ ᴅɪᴀɢɴᴏsᴛɪᴄs**\\n\\n" + "\\n".join(results))
+    await _send(update, context, "**ᴄʟᴏɴᴇ ᴍᴀɴᴀɢᴇʀ ᴅɪᴀɢɴᴏsᴛɪᴄs**\n\n" + "\n".join(results))
 
 
 def add_admin_handlers(app):
