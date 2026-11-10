@@ -63,7 +63,8 @@ async def select_product(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await send_branded(context.bot,query.message.chat_id,
         context.application.bot_data["defaults"]["cloner.token"],
         image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
-        small_caps=context.application.bot_data["small_caps"])
+        small_caps=context.application.bot_data["small_caps"],
+        footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
     product=context.user_data.get("pending_clone_product")
