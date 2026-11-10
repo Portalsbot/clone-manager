@@ -19,6 +19,15 @@ def _allowed(user_id:int, context)->bool:
     return user_id in context.application.bot_data["allowed_users"]
 
 async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
+    db=context.application.bot_data["db"]
+    clone_id=context.application.bot_data["clone_id"]
+    user_id=update.effective_user.id
+    existing=await db.require().fetchrow("SELECT is_banned FROM bot_users WHERE clone_id=$1 AND user_id=$2",clone_id,user_id)
+    if existing and existing["is_banned"]:
+        await _send(update,context,"ʏᴏᴜ ᴄᴀɴɴᴏᴛ ᴜsᴇ ᴛʜɪs ʙᴏᴛ. ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ.")
+        return
+    await db.require().execute("""INSERT INTO bot_users(clone_id,user_id) VALUES($1,$2)
+        ON CONFLICT(clone_id,user_id) DO UPDATE SET last_seen=NOW()""",clone_id,user_id)
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     markup=InlineKeyboardMarkup([
         [InlineKeyboardButton("· ᴀʙᴏᴜᴛ ·",callback_data="admin:about"),InlineKeyboardButton("· ᴄʜᴀɴɴᴇʟ ·",callback_data="admin:channel")],
