@@ -5,6 +5,8 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from ..branding import send_branded, keyboard_from_buttons
 
+SETTING_KEYS = {"manager.start":"message.start","manager.about":"message.about","manager.help":"message.help"}
+
 
 def allowed(update: Update, owner_id: int, admins: set[int]) -> bool:
     user = update.effective_user
@@ -13,13 +15,34 @@ def allowed(update: Update, owner_id: int, admins: set[int]) -> bool:
 async def texts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
         return
-    keys = sorted(context.application.bot_data["defaults"].keys())
-    listing = "**ᴍᴇssᴀɢᴇ ᴇᴅɪᴛᴏʀ**\n\n" + "\n".join(f"• `{key}` — /edittext {key}" for key in keys)
-    await send_branded(context.bot, update.effective_chat.id, listing,
-                       image_url=context.application.bot_data["image_url"],
-                       image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"],
-                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+    keys=sorted(context.application.bot_data["defaults"].keys())
+    listing="(Quote start) ᴍʏ ᴍᴇssᴀɢᴇ ᴇᴅɪᴛᴏʀ 🎀 (Quote end)\n\nᴄʜᴏᴏsᴇ ᴀ ᴛᴇxᴛ ᴛᴏ ᴇᴅɪᴛ."
+    buttons=[InlineKeyboardButton(key,callback_data=f"textedit:{key}") for key in keys]
+    keyboard=[buttons[i:i+2] for i in range(0,len(buttons),2)]
+    await send_branded(context.bot,update.effective_chat.id,listing,
+        image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+        small_caps=context.application.bot_data["small_caps"],reply_markup=InlineKeyboardMarkup(keyboard),
+        footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+
+async def select_template_callback(update,context):
+    q=update.callback_query
+    if not allowed(update,context.application.bot_data["owner_id"],context.application.bot_data["admins"]):
+        await q.answer("Owner / Admin only.",show_alert=True); return
+    await q.answer()
+    key=q.data.split(":",1)[1]
+    defaults=context.application.bot_data["defaults"]
+    if key not in defaults: return
+    context.user_data["editing_text_key"]=key
+    if key in SETTING_KEYS:
+        setting_key=SETTING_KEYS[key]
+        context.user_data["editing_setting_key"]=setting_key
+        current=await context.application.bot_data["db"].get_setting(setting_key,defaults[key])
+    else:
+        current=await context.application.bot_data["db"].get_text(context.application.bot_data["clone_id"],key,defaults[key])
+    await send_branded(context.bot,q.message.chat_id,f"ᴇᴅɪᴛɪɴɢ: {key}\n\nᴄᴜʀʀᴇɴᴛ ᴛᴇxᴛ:\n{current}\n\nSᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴛᴇxᴛ ɴᴏᴡ.",
+        image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+        small_caps=context.application.bot_data["small_caps"],
+        footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def edittext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
@@ -32,15 +55,19 @@ async def edittext(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = f"Unknown template key: `{key}`. Use /texts."
         else:
             context.user_data["editing_text_key"] = key
-            current = await context.application.bot_data["db"].get_text(
-                context.application.bot_data["clone_id"], key,
-                context.application.bot_data["defaults"][key],
-            )
-            msg = f"Editing `{key}`. Send the complete replacement text now.\n\nCurrent value:\n{current}"
+            if key in SETTING_KEYS:
+                setting_key=SETTING_KEYS[key]
+                context.user_data["editing_setting_key"]=setting_key
+                current=await context.application.bot_data["db"].get_setting(setting_key,context.application.bot_data["defaults"][key])
+            else:
+                current=await context.application.bot_data["db"].get_text(
+                    context.application.bot_data["clone_id"],key,context.application.bot_data["defaults"][key])
+            msg=f"Editing `{key}`. Send the complete replacement text now.\n\nCurrent value:\n{current}"
     await send_branded(context.bot, update.effective_chat.id, msg,
                        image_url=context.application.bot_data["image_url"],
                        image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"])
+                       small_caps=context.application.bot_data["small_caps"],
+                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def previewtext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
@@ -54,9 +81,12 @@ async def previewtext(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if key not in defaults:
             body, markup = "Unknown template key. Use /texts.", None
         else:
-            body = await context.application.bot_data["db"].get_text(
-                context.application.bot_data["clone_id"], key, defaults[key]
-            )
+            if key in SETTING_KEYS:
+                body=await context.application.bot_data["db"].get_setting(SETTING_KEYS[key],defaults[key])
+            else:
+                body = await context.application.bot_data["db"].get_text(
+                    context.application.bot_data["clone_id"], key, defaults[key]
+                )
             rows = await context.application.bot_data["db"].get_buttons(
                 context.application.bot_data["clone_id"], key
             )
@@ -64,7 +94,8 @@ async def previewtext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_branded(context.bot, update.effective_chat.id, body,
                        image_url=context.application.bot_data["image_url"],
                        image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"], reply_markup=markup)
+                       small_caps=context.application.bot_data["small_caps"], reply_markup=markup,
+                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def resettext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
@@ -76,12 +107,17 @@ async def resettext(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if key not in context.application.bot_data["defaults"]:
             body = "Unknown template key. Use /texts."
         else:
-            await context.application.bot_data["db"].reset_text(context.application.bot_data["clone_id"], key)
+            if key in SETTING_KEYS:
+                await context.application.bot_data["db"].delete_setting(SETTING_KEYS[key])
+            else:
+                await context.application.bot_data["db"].reset_text(context.application.bot_data["clone_id"], key)
             body = f"Default template restored: `{key}`"
     await send_branded(context.bot, update.effective_chat.id, body,
                        image_url=context.application.bot_data["image_url"],
                        image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"])
+                       small_caps=context.application.bot_data["small_caps"],
+                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+
 
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
@@ -98,7 +134,8 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_branded(context.bot, update.effective_chat.id, body,
                        image_url=context.application.bot_data["image_url"],
                        image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"])
+                       small_caps=context.application.bot_data["small_caps"],
+                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
 async def addbutton(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]): return
@@ -179,10 +216,13 @@ async def capture_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
         context.user_data.pop("editing_text_key", None)
         return
-    target_clone = context.user_data.pop("editing_clone_id", context.application.bot_data["clone_id"])
-    await context.application.bot_data["db"].set_text(
-        target_clone, key, update.effective_message.text
-    )
+    setting_key=context.user_data.pop("editing_setting_key",None)
+    if setting_key:
+        await context.application.bot_data["db"].set_setting(setting_key,update.effective_message.text)
+        if setting_key=="message.start": context.application.bot_data["defaults"]["manager.start"]=update.effective_message.text
+    else:
+        target_clone = context.user_data.pop("editing_clone_id", context.application.bot_data["clone_id"])
+        await context.application.bot_data["db"].set_text(target_clone,key,update.effective_message.text)
     context.user_data.pop("editing_text_key", None)
     await send_branded(context.bot, update.effective_chat.id,
                        f"Saved `{key}`. Preview it using `/previewtext {key}`.",
@@ -193,6 +233,7 @@ async def capture_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def add_editor_handlers(app):
     app.add_handler(CommandHandler("texts", texts))
+    app.add_handler(CallbackQueryHandler(select_template_callback,pattern=r"^textedit:"))
     app.add_handler(CommandHandler("edittext", edittext))
     app.add_handler(CommandHandler("previewtext", previewtext))
     app.add_handler(CommandHandler("resettext", resettext))

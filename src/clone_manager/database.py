@@ -32,3 +32,6 @@ class Database:
     async def set_setting(self,key,value):
         await self.require().execute("""INSERT INTO bot_settings(setting_key,value) VALUES($1,$2)
         ON CONFLICT(setting_key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()""",key,str(value))
+
+    async def delete_setting(self,key):
+        await self.require().execute("DELETE FROM bot_settings WHERE setting_key=$1",key)
