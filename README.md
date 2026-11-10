@@ -83,3 +83,5 @@ The Docker socket is highly privileged. Keep this bot private, restrict administ
 ## Web-service health check and Docker requirement
 
 When the platform supplies `PORT`, the manager starts an HTTP health endpoint at `/health`. This only reports process liveness. Run `/diagnostics` in Telegram to verify PostgreSQL and Docker. The manager cannot create clones unless it can access a Docker daemon and the daemon can mount the configured `CLONE_SECRET_DIR`. Standard hosted web-service containers do not automatically provide Docker socket access.
+
+For broadcast URL buttons, include one line per button in the message: `[button] LABEL | https://URL`. The preview and final delivery preserve those URL buttons.
