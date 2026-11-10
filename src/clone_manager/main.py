@@ -1,5 +1,7 @@
 from __future__ import annotations
 import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from telegram import BotCommand, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CallbackQueryHandler, MessageHandler, filters
@@ -115,6 +117,38 @@ async def post_shutdown(app):
     db=app.bot_data.get("db")
     if db: await db.close()
 
+
+def _start_health_server():
+    raw_port = os.getenv("PORT", "").strip()
+    if not raw_port:
+        return None
+    try:
+        port = int(raw_port)
+        if not 1 <= port <= 65535:
+            raise ValueError
+    except ValueError as exc:
+        raise RuntimeError("PORT must be a valid TCP port.") from exc
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path not in {"/", "/health"}:
+                self.send_response(404)
+                self.end_headers()
+                return
+            body = b'{"status":"ok","service":"clone-manager"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    threading.Thread(target=server.serve_forever, name="http-health", daemon=True).start()
+    return server
+
 def main():
     settings=Settings.from_env()
     owner_id=settings.owner_id
@@ -137,6 +171,7 @@ def main():
     add_editor_handlers(app)
     add_admin_handlers(app)
     app.add_error_handler(error_handler)
+    app.bot_data["health_server"] = _start_health_server()
     app.run_polling(allowed_updates=["message","callback_query"])
 
 if __name__=="__main__": main()
