@@ -99,14 +99,15 @@ async def about(update,context):
     if not await _owner_admin(update,context): return
     me=await context.bot.get_me()
     body=await context.application.bot_data["db"].get_setting("message.about",MENU_TEXT["about"])
-    await _send(context,update.effective_chat.id,body.format(botname=me.first_name,owner=context.application.bot_data["owner_id"]),_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
+    await _send(context,update.effective_chat.id,body.format(botname=me.first_name,owner=context.application.bot_data["owner_id"]))
 async def help_command(update,context):
     if not await _owner_admin(update,context): return
     body=await context.application.bot_data["db"].get_setting("message.help",MENU_TEXT["help"])
     body=body.format(mention=update.effective_user.mention_html())
     await _send(context,update.effective_chat.id,body,_markup([[("· ᴀʙᴏᴜᴛ ·","admin:about"),("· ᴄʜᴀɴɴᴇʟ ·","admin:channel")],[("· ᴄᴏᴍᴍᴀɴᴅs ·","admin:commands")]]))
 async def commands(update,context):
-    await simple_menu(update,context,"commands")
+    if not await _owner_admin(update,context): return
+    await _send(context,update.effective_chat.id,MENU_TEXT["commands"])
 async def settings(update,context):
     await simple_menu(update,context,"settings",SETTINGS_ROWS)
 async def broadcast(update,context):
@@ -249,10 +250,10 @@ async def callback_router(update,context):
         elif key=="about":
             me=await context.bot.get_me()
             body=await context.application.bot_data["db"].get_setting("message.about",MENU_TEXT["about"])
-            await _send(context,q.message.chat_id,body.format(botname=me.first_name,owner=context.application.bot_data["owner_id"]),_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
+            await _send(context,q.message.chat_id,body.format(botname=me.first_name,owner=context.application.bot_data["owner_id"]))
         elif key=="channel":
-            body="╭───────────────⍟\\n├➽ Dᴇᴠᴇʟᴏᴩᴇʀ : @Just_astha\\n├➽ Oᴡɴᴇʀ : @Just_astha\\n├➽ Aɴɪᴍᴇ Iɴᴅᴇx : @Master_Index\\n├➽ Fɪɴɪsʜᴇᴅ Aɴɪᴍᴇ : @anime_portals\\n├➽ Oɴɢᴏɪɴɢ Aɴɪᴍᴇ : @ongoing_portals\\n├➽ Mᴀɴʜᴡᴀ / Mᴀɴɢᴀ: @Manga_Portals\\n├➽ Nᴇᴛᴡᴏʀᴋ : @Anime_Gateway\\n├➽ Rᴇǫ/Cʜᴀᴛ : https://t.me/+lB05vD5bGyszMzg1\\n╰───────────────⍟"
-            await _send(context,q.message.chat_id,body,_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
+            body="(Quote start)\\n╭───────────────⍟\\n├➽ Dᴇᴠᴇʟᴏᴩᴇʀ : @Just_astha\\n├➽ Oᴡɴᴇʀ : @Just_astha\\n├➽ Aɴɪᴍᴇ Iɴᴅᴇx : @Master_Index\\n├➽ Fɪɴɪsʜᴇᴅ Aɴɪᴍᴇ : @anime_portals\\n├➽ Oɴɢᴏɪɴɢ Aɴɪᴍᴇ : @ongoing_portals\\n├➽ Mᴀɴʜᴡᴀ / Mᴀɴɢᴀ: @Manga_Portals\\n├➽ Nᴇᴛᴡᴏʀᴋ : @Anime_Gateway\\n├➽ Rᴇǫ/Cʜᴀᴛ : https://t.me/+lB05vD5bGyszMzg1\\n╰───────────────⍟\\n(Quote end)"
+            await _send(context,q.message.chat_id,body)
         else: await _send(context,q.message.chat_id,f"{key.title()} settings",_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
     elif data.startswith("maintenance:"):
         action=data.split(":")[1]; db=context.application.bot_data["db"]
