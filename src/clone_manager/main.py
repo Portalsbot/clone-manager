@@ -14,6 +14,7 @@ from .message_editor.handlers import add_editor_handlers
 from .admin import add_admin_handlers, command_access_gate
 from .errors import error_handler
 from .branding import close_branded_message
+from .fsubs import add_fsubs_handlers, message_fsubs_gate, callback_fsubs_gate
 
 async def post_init(app):
     s=app.bot_data["settings"]
@@ -167,6 +168,8 @@ def main():
         "image_url":settings.branding_image_url,"image_path":settings.branding_image_path,
         "small_caps":settings.small_caps,"defaults":DEFAULT_MESSAGES,"allowed_users":allowed,
         "encryption_key":encryption_key,"provisioner":DockerProvisioner()})
+    app.add_handler(MessageHandler(filters.ALL, message_fsubs_gate), group=-110)
+    app.add_handler(CallbackQueryHandler(callback_fsubs_gate), group=-11)
     app.add_handler(CallbackQueryHandler(close_branded_message,pattern=r"^branding:close$"),group=-10)
     app.add_handler(CallbackQueryHandler(callback_access_gate), group=-9)
     app.add_handler(MessageHandler(filters.COMMAND, command_access_gate), group=-100)
@@ -174,6 +177,7 @@ def main():
     add_clone_handlers(app)
     add_editor_handlers(app)
     add_admin_handlers(app)
+    add_fsubs_handlers(app)
     app.add_error_handler(error_handler)
     app.bot_data["health_server"] = _start_health_server()
     app.run_polling(allowed_updates=["message","callback_query"])
