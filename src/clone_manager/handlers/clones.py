@@ -114,7 +114,7 @@ async def clones(update:Update,context:ContextTypes.DEFAULT_TYPE):
     db=context.application.bot_data["db"]
     rows=await db.require().fetch(
         "SELECT clone_id,product,bot_username,status,created_at,container_id FROM clone_instances WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 50",
-        update.effective_user.id)
+        context.application.bot_data["owner_id"])
     statuses={}
     for row in rows:
         live=await context.application.bot_data["provisioner"].status(row["container_id"]) if row["container_id"] else "unknown"
@@ -140,7 +140,7 @@ async def clone_detail_callback(update,context):
     await q.answer()
     clone_id=q.data.split(":",2)[2]
     row=await context.application.bot_data["db"].require().fetchrow(
-        "SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,q.from_user.id)
+        "SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
     if not row:
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
     icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
@@ -155,7 +155,7 @@ async def clone_manage_callback(update,context):
     await q.answer()
     _,action,clone_id=q.data.split(":",2)
     db=context.application.bot_data["db"]
-    row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,q.from_user.id)
+    row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
     if not row:
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
     if action in {"stop","restart"}:
@@ -176,7 +176,7 @@ async def _clone_action_menu(update,context,action):
     if not _allowed(update.effective_user.id,context):
         await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ."); return
     rows=await context.application.bot_data["db"].require().fetch(
-        "SELECT clone_id,bot_username,status FROM clone_instances WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 100",update.effective_user.id)
+        "SELECT clone_id,bot_username,status FROM clone_instances WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 100",context.application.bot_data["owner_id"])
     if not rows:
         await _send(update,context,"ɴᴏ ᴄʟᴏɴᴇs ᴀʀᴇ ʀᴇɢɪsᴛᴇʀᴇᴅ ʏᴇᴛ."); return
     buttons=[InlineKeyboardButton(("🟢 " if row["status"]=="running" else "🔴 " if row["status"]=="stopped" else "⚪ ")+f"@{row['bot_username']}",callback_data=f"clone:{action}:{row['clone_id']}") for row in rows]
@@ -190,7 +190,7 @@ async def stopclone(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if not context.args: return await _clone_action_menu(update,context,"stop")
     else:
         row=await context.application.bot_data["db"].require().fetchrow("SELECT owner_id,container_id FROM clone_instances WHERE clone_id=$1",context.args[0])
-        if not row or row["owner_id"]!=update.effective_user.id: body="Clone not found or not owned by you."
+        if not row or row["owner_id"]!=context.application.bot_data["owner_id"]: body="Clone not found or not owned by you."
         else:
             await context.application.bot_data["provisioner"].stop(row["container_id"])
             await context.application.bot_data["db"].require().execute("UPDATE clone_instances SET status='stopped',updated_at=NOW() WHERE clone_id=$1",context.args[0]); body="Clone stopped."
@@ -224,7 +224,7 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
         body+="\n".join(("🟢 " if row["status"]=="running" else "🔴 " if row["status"]=="stopped" else "⚪ ")+f"@{row['bot_username']} — /cloneinfo {row['clone_id']}" for row in rows)
     else:
         row=await context.application.bot_data["db"].require().fetchrow(
-            "SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",context.args[0],update.effective_user.id)
+            "SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",context.args[0],context.application.bot_data["owner_id"])
         if not row:
             body="ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."
         else:
