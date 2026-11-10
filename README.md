@@ -70,8 +70,11 @@ python -m clone_manager.main
 ```
 
 ## Current implementation boundaries
-- Text and media broadcasts support preview, immediate delivery, scheduled delivery in Asia/Kolkata time, queue inspection/cancellation and delivery reports. Scheduled payloads persist in PostgreSQL.
-- `/clonedit` is the clone configuration editor. Docker is the configured deployment backend; external hosting-provider migration requires a provider adapter and credentials.
-- Clone provisioning requires a working Docker daemon, configured private images and GHCR credentials when applicable.
+- Text and media broadcasts support preview, immediate delivery, URL buttons, scheduled delivery in Asia/Kolkata time, queue inspection/cancellation and delivery reports. Scheduled payloads persist in PostgreSQL.
+- `/clonedit` is the clone configuration editor. Docker is the configured deployment backend; automatic GitHub-to-Docker image building remains intentionally out of scope.
+- `/diagnostics` checks Telegram API access, PostgreSQL, Docker daemon availability, product image configuration and the clone secret directory.
+- The HTTP health endpoint is `/health` when a `PORT` environment variable is supplied.
+- Clone provisioning requires a working Docker daemon, pre-published File/Link images and GHCR credentials when packages are private.
+- The manager must run on the same host as its Docker daemon and secret-file mount path. A normal Render web service does not expose a Docker socket, so clone creation cannot work there without a separate supported Docker host and a shared host path for secret mounts.
 
 The Docker socket is highly privileged. Keep this bot private, restrict administrators, protect the host and secret directory, and never log plaintext BotFather tokens.
