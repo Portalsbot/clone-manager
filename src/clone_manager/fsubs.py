@@ -163,9 +163,10 @@ async def fsubs_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _send_gate(context, query.message.chat_id, missing)
             return
         await query.answer("Membership verified.")
-        pending = context.user_data.pop("fsubs_pending_payload", None)
+        context.user_data.pop("fsubs_pending_payload", None)
         synthetic = SimpleNamespace(effective_chat=query.message.chat, effective_user=query.from_user)
-        await _send(context, query.message.chat_id, "Membership verified. Send /start again to continue.")
+        from .handlers.clones import start
+        await start(synthetic, context)
         return
     await query.answer()
     if action in {"fsubs:panel", "fsubs:back"}:
