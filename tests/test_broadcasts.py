@@ -40,6 +40,7 @@ def test_media_payload_stores_file_id_and_caption():
         "media_type": "photo",
         "file_id": "telegram-file-id",
         "caption": "hello caption",
+        "buttons": [],
     }
 
 
