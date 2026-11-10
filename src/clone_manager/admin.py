@@ -17,7 +17,7 @@ from .formatting import render_text
 FOOTER_DEFAULT = '(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)'
 IMAGE_DEFAULT = "https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png"
 MENU_TEXT = {
-    "about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\n\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.\n\n◈ ᴏᴡɴᴇʀ: {owner}\n◈ ᴅᴇᴠᴇʟᴏᴘᴇʀ: @Just_Astha\n◈ ᴅᴀᴛᴀʙᴀsᴇ: MongoDB-compatible interface / PostgreSQL storage",
+    "about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\\n\\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.\\n\\n◈ ᴏᴡɴᴇʀ: @Just_astha\\n◈ ᴅᴇᴠᴇʟᴏᴘᴇʀ: @Just_astha\\n◈ ʟᴀɴɢᴜᴀɢᴇ: Python\\n◈ ʟɪʙʀᴀʀʏ: python-telegram-bot\\n◈ ᴅᴀᴛᴀʙᴀsᴇ: PostgreSQL",
     "help": "ʜᴇʏ {mention}! ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ: @Just_astha",
     "commands": "(Quote start) ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs (Quote end)\n\n/clone · /commands · /settings\n/about · /help · /broadcast · /users\n/stats · /logs · /ping · /restart\n/maintenance · /setmaintenance\n/setstart · /setabout · /sethelp\n/setimage · /setbuttons · /setfooter\n/setquote · /setname · /clones\n/stopclone · /restartclone · /cloneedit\n/cloneinfo · /texts · /edittext",
     "settings": "╭───────────────⍟\n├➤ ʙᴏᴛ sᴇᴛᴛɪɴɢs\n├➤ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ʙᴏᴛ ᴘʀᴇғᴇʀᴇɴᴄᴇs ʙᴇʟᴏᴡ.\n╰───────────────⍟",
