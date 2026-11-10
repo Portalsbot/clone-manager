@@ -24,50 +24,86 @@ async def texts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         small_caps=context.application.bot_data["small_caps"],reply_markup=InlineKeyboardMarkup(keyboard),
         footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
 
+def _text_editor_markup():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("· ᴘʀᴇᴠɪᴇᴡ ·",callback_data="textaction:preview"),InlineKeyboardButton("· ᴇᴅɪᴛ ᴛᴇxᴛ ·",callback_data="textaction:edit")],
+        [InlineKeyboardButton("· sᴀᴠᴇ ·",callback_data="textaction:save"),InlineKeyboardButton("· ᴄᴀɴᴄᴇʟ ·",callback_data="textaction:cancel")],
+    ])
+
+async def _begin_template_edit(update,context,key,chat_id=None):
+    defaults=context.application.bot_data["defaults"]
+    if key not in defaults:
+        await send_branded(context.bot,chat_id or update.effective_chat.id,"ᴜɴᴋɴᴏᴡɴ ᴍᴇssᴀɢᴇ ᴋᴇʏ. ᴜsᴇ /texts.",
+            image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+            small_caps=context.application.bot_data["small_caps"])
+        return
+    setting_key=SETTING_KEYS.get(key)
+    clone_id=context.application.bot_data["clone_id"]
+    if setting_key:
+        current=await context.application.bot_data["db"].get_setting(setting_key,defaults[key])
+    else:
+        current=await context.application.bot_data["db"].get_text(clone_id,key,defaults[key])
+    context.user_data["pending_text_editor"]={"key":key,"setting_key":setting_key,"clone_id":clone_id,"current":current}
+    await send_branded(context.bot,chat_id or update.effective_chat.id,
+        f"(Quote start) ᴇᴅɪᴛɪɴɢ {key} (Quote end)\n\nᴄᴜʀʀᴇɴᴛ ᴛᴇxᴛ:\n{current}\n\nᴄʜᴏᴏsᴇ ᴀɴ ᴀᴄᴛɪᴏɴ ʙᴇʟᴏᴡ.",
+        image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+        small_caps=context.application.bot_data["small_caps"],reply_markup=_text_editor_markup(),
+        footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+
 async def select_template_callback(update,context):
     q=update.callback_query
     if not allowed(update,context.application.bot_data["owner_id"],context.application.bot_data["admins"]):
         await q.answer("Owner / Admin only.",show_alert=True); return
     await q.answer()
-    key=q.data.split(":",1)[1]
-    defaults=context.application.bot_data["defaults"]
-    if key not in defaults: return
-    context.user_data["editing_text_key"]=key
-    if key in SETTING_KEYS:
-        setting_key=SETTING_KEYS[key]
-        context.user_data["editing_setting_key"]=setting_key
-        current=await context.application.bot_data["db"].get_setting(setting_key,defaults[key])
-    else:
-        current=await context.application.bot_data["db"].get_text(context.application.bot_data["clone_id"],key,defaults[key])
-    await send_branded(context.bot,q.message.chat_id,f"ᴇᴅɪᴛɪɴɢ: {key}\n\nᴄᴜʀʀᴇɴᴛ ᴛᴇxᴛ:\n{current}\n\nSᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴛᴇxᴛ ɴᴏᴡ.",
-        image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
-        small_caps=context.application.bot_data["small_caps"],
-        footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+    await _begin_template_edit(update,context,q.data.split(":",1)[1],chat_id=q.message.chat_id)
+
+async def textaction_callback(update,context):
+    q=update.callback_query
+    if not allowed(update,context.application.bot_data["owner_id"],context.application.bot_data["admins"]):
+        await q.answer("Owner / Admin only.",show_alert=True); return
+    await q.answer()
+    pending=context.user_data.get("pending_text_editor")
+    if not pending:
+        await q.answer("This editing session has expired.",show_alert=True); return
+    action=q.data.split(":",1)[1]
+    if action=="edit":
+        context.user_data["awaiting_text_draft"]=True
+        await send_branded(context.bot,q.message.chat_id,
+            "sᴇɴᴅ ᴛʜᴇ ᴄᴏᴍᴘʟᴇᴛᴇ ɴᴇᴡ ᴍᴇssᴀɢᴇ ᴛᴇxᴛ. ɪᴛ ᴡɪʟʟ ɴᴏᴛ ʙᴇ sᴀᴠᴇᴅ ᴜɴᴛɪʟ ʏᴏᴜ ᴘʀᴇss sᴀᴠᴇ.",
+            image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+            small_caps=context.application.bot_data["small_caps"])
+    elif action=="preview":
+        await send_branded(context.bot,q.message.chat_id,pending.get("draft",pending["current"]),
+            image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+            small_caps=context.application.bot_data["small_caps"],
+            footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+    elif action=="save":
+        if "draft" not in pending:
+            await q.answer("No draft is ready to save.",show_alert=True); return
+        if pending["setting_key"]:
+            await context.application.bot_data["db"].set_setting(pending["setting_key"],pending["draft"])
+            if pending["key"]=="manager.start":
+                context.application.bot_data["defaults"]["manager.start"]=pending["draft"]
+        else:
+            await context.application.bot_data["db"].set_text(pending["clone_id"],pending["key"],pending["draft"])
+        context.user_data.pop("pending_text_editor",None)
+        context.user_data.pop("awaiting_text_draft",None)
+        await send_branded(context.bot,q.message.chat_id,"ᴍᴇssᴀɢᴇ sᴀᴠᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ! ♡",
+            image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+            small_caps=context.application.bot_data["small_caps"])
+    elif action=="cancel":
+        context.user_data.pop("pending_text_editor",None)
+        context.user_data.pop("awaiting_text_draft",None)
+        await send_branded(context.bot,q.message.chat_id,"ᴄᴀɴᴄᴇʟʟᴇᴅ. ᴛʜᴇ ᴏʟᴅ ᴍᴇssᴀɢᴇ ʀᴇᴍᴀɪɴs ᴜɴᴄʜᴀɴɢᴇᴅ.",
+            image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+            small_caps=context.application.bot_data["small_caps"])
 
 async def edittext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
         return
     if not context.args:
-        return await texts(update, context)
-    else:
-        key = context.args[0]
-        if key not in context.application.bot_data["defaults"]:
-            msg = f"Unknown template key: `{key}`. Use /texts."
-        else:
-            context.user_data["editing_text_key"] = key
-            if key in SETTING_KEYS:
-                setting_key=SETTING_KEYS[key]
-                context.user_data["editing_setting_key"]=setting_key
-                current=await context.application.bot_data["db"].get_setting(setting_key,context.application.bot_data["defaults"][key])
-            else:
-                current=await context.application.bot_data["db"].get_text(
-                    context.application.bot_data["clone_id"],key,context.application.bot_data["defaults"][key])
-            msg=f"Editing `{key}`. Send the complete replacement text now.\n\nCurrent value:\n{current}"
-    await send_branded(context.bot, update.effective_chat.id, msg,
-                       image_url=context.application.bot_data["image_url"],
-                       image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"],
-                       footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+        return await texts(update,context)
+    await _begin_template_edit(update,context,context.args[0])
 
 async def previewtext(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
@@ -210,29 +246,41 @@ async def editbutton(update: Update, context: ContextTypes.DEFAULT_TYPE):
                        small_caps=context.application.bot_data["small_caps"])
 
 async def capture_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    key = context.user_data.get("editing_text_key")
-    if not key or not update.effective_message or not update.effective_message.text:
+    if not update.effective_message or not update.effective_message.text:
         return
     if not allowed(update, context.application.bot_data["owner_id"], context.application.bot_data["admins"]):
         context.user_data.pop("editing_text_key", None)
+        context.user_data.pop("pending_text_editor", None)
+        return
+    pending=context.user_data.get("pending_text_editor")
+    if pending and context.user_data.get("awaiting_text_draft"):
+        pending["draft"]=update.effective_message.text
+        context.user_data["awaiting_text_draft"]=False
+        await send_branded(context.bot,update.effective_chat.id,
+            "ᴅʀᴀғᴛ ʀᴇᴄᴇɪᴠᴇᴅ! ᴘʀᴇᴠɪᴇᴡ ɪᴛ ᴏʀ sᴀᴠᴇ ᴛᴏ ᴀᴘᴘʟʏ ᴛʜᴇ ᴄʜᴀɴɢᴇ.",
+            image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+            small_caps=context.application.bot_data["small_caps"],reply_markup=_text_editor_markup(),
+            footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
+        return
+    key=context.user_data.get("editing_text_key")
+    if not key:
         return
     setting_key=context.user_data.pop("editing_setting_key",None)
     if setting_key:
         await context.application.bot_data["db"].set_setting(setting_key,update.effective_message.text)
-        if setting_key=="message.start": context.application.bot_data["defaults"]["manager.start"]=update.effective_message.text
+        if setting_key=="message.start":
+            context.application.bot_data["defaults"]["manager.start"]=update.effective_message.text
     else:
-        target_clone = context.user_data.pop("editing_clone_id", context.application.bot_data["clone_id"])
+        target_clone=context.user_data.pop("editing_clone_id",context.application.bot_data["clone_id"])
         await context.application.bot_data["db"].set_text(target_clone,key,update.effective_message.text)
-    context.user_data.pop("editing_text_key", None)
-    await send_branded(context.bot, update.effective_chat.id,
-                       f"Saved `{key}` successfully.",
-                       image_url=context.application.bot_data["image_url"],
-                       image_path=context.application.bot_data["image_path"],
-                       small_caps=context.application.bot_data["small_caps"])
-
+    context.user_data.pop("editing_text_key",None)
+    await send_branded(context.bot,update.effective_chat.id,f"Saved {key} successfully.",
+        image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
+        small_caps=context.application.bot_data["small_caps"])
 
 def add_editor_handlers(app):
     app.add_handler(CommandHandler("texts", texts))
     app.add_handler(CallbackQueryHandler(select_template_callback,pattern=r"^textedit:"))
+    app.add_handler(CallbackQueryHandler(textaction_callback,pattern=r"^textaction:"))
     app.add_handler(CommandHandler("edittext", edittext))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, capture_edit), group=-1)

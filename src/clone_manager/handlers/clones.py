@@ -52,7 +52,8 @@ async def clone(update:Update,context:ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("ғɪʟᴇ sʜᴀʀɪɴɢ ʙᴏᴛ",callback_data="clone:select:file")],
         [InlineKeyboardButton("ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛ",callback_data="clone:select:link")],
     ])
-    await _send(update,context,context.application.bot_data["defaults"]["cloner.select"],markup)
+    body=await context.application.bot_data["db"].get_text(context.application.bot_data["clone_id"],"cloner.select",context.application.bot_data["defaults"]["cloner.select"])
+    await _send(update,context,body,markup)
 
 async def select_product(update:Update,context:ContextTypes.DEFAULT_TYPE):
     query=update.callback_query; await query.answer()
@@ -60,8 +61,9 @@ async def select_product(update:Update,context:ContextTypes.DEFAULT_TYPE):
     product=query.data.rsplit(":",1)[-1]
     if product not in {"file","link"}: return
     context.user_data["pending_clone_product"]=product
+    token_prompt=await context.application.bot_data["db"].get_text(context.application.bot_data["clone_id"],"cloner.token",context.application.bot_data["defaults"]["cloner.token"])
     await send_branded(context.bot,query.message.chat_id,
-        context.application.bot_data["defaults"]["cloner.token"],
+        token_prompt,
         image_url=context.application.bot_data["image_url"],image_path=context.application.bot_data["image_path"],
         small_caps=context.application.bot_data["small_caps"],
         footer_message=await context.application.bot_data["db"].get_setting("branding.footer",""))
@@ -101,7 +103,8 @@ async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
         provisioner=context.application.bot_data["provisioner"]
         container_id=await provisioner.create(product,clone_id,token,update.effective_user.id)
         await db.require().execute("UPDATE clone_instances SET container_id=$1,status='running',updated_at=NOW() WHERE clone_id=$2",container_id,clone_id)
-        await _send(update,context,f"✅ ᴄʟᴏɴᴇ ᴅᴇᴘʟᴏʏᴇᴅ: @{me.username}\nhttps://t.me/{me.username}\nProduct: {product.title()}\nID: `{clone_id}`")
+        success_template=await db.get_text(context.application.bot_data["clone_id"],"cloner.success",context.application.bot_data["defaults"]["cloner.success"])
+        await _send(update,context,success_template.format(username=me.username or me.id,product=product.title(),clone_id=clone_id))
     except Exception as exc:
         log.exception("Clone provisioning failed (%s)",type(exc).__name__)
         await db.require().execute("UPDATE clone_instances SET status='failed',error_code=$1,updated_at=NOW() WHERE clone_id=$2",type(exc).__name__,clone_id)
