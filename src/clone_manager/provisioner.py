@@ -12,7 +12,7 @@ import docker
 
 class DockerProvisioner:
     def __init__(self):
-        self.client=docker.from_env()
+        self.client=docker.from_env(timeout=15)
         self.secret_root=Path(os.getenv("CLONE_SECRET_DIR","/var/lib/clone-manager/secrets"))
         self.database_url=os.environ["DATABASE_URL"]
         self.branding_url=os.getenv("BRANDING_IMAGE_URL","https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png")
