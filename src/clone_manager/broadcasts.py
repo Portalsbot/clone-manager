@@ -86,7 +86,7 @@ def serialize_message(message) -> dict:
             "caption": extract_buttons(message.caption or ""),
             "buttons": buttons,
         }
-    raise ValueError("sᴇɴᴅ ᴛᴇxᴛ ᴏʀ sᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ (ᴘʜᴏᴛᴏ, ᴠɪᴅᴇᴏ, ᴅᴏᴄᴜᴍᴇɴᴛ, ᴀᴜᴅɪᴏ, ᴀɴɪᴍᴀᴛɪᴏɴ, ᴠᴏɪᴄᴇ, ᴠɪᴅᴇᴏ ɴᴏᴛᴇ, sᴛɪᴄᴋᴇʀ).
+    raise ValueError("sᴇɴᴅ ᴛᴇxᴛ ᴏʀ sᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ (ᴘʜᴏᴛᴏ, ᴠɪᴅᴇᴏ, ᴅᴏᴄᴜᴍᴇɴᴛ, ᴀᴜᴅɪᴏ, ᴀɴɪᴍᴀᴛɪᴏɴ, ᴠᴏɪᴄᴇ, ᴠɪᴅᴇᴏ ɴᴏᴛᴇ, sᴛɪᴄᴋᴇʀ).")
 
 def _is_admin(user_id: int, context) -> bool:
     return user_id == context.application.bot_data["owner_id"] or user_id in context.application.bot_data.get("admins", set())
