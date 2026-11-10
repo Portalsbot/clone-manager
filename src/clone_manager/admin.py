@@ -19,7 +19,7 @@ IMAGE_DEFAULT = "https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7
 MENU_TEXT = {
     "about": "ᴍʏ ɴᴀᴍᴇ ɪs {botname}\\n\\nɪ ᴀᴍ ᴀ ᴘʀɪᴠᴀᴛᴇ ᴄʟᴏɴɪɴɢ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴍᴀᴋᴇ ʙᴏᴛ ᴅᴇᴘʟᴏʏᴍᴇɴᴛ ᴀɴᴅ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ sɪᴍᴘʟᴇ, ғᴀsᴛ ᴀɴᴅ ʀᴇʟɪᴀʙʟᴇ.\\n\\n◈ ᴏᴡɴᴇʀ: @Just_astha\\n◈ ᴅᴇᴠᴇʟᴏᴘᴇʀ: @Just_astha\\n◈ ʟᴀɴɢᴜᴀɢᴇ: Python\\n◈ ʟɪʙʀᴀʀʏ: python-telegram-bot\\n◈ ᴅᴀᴛᴀʙᴀsᴇ: PostgreSQL",
     "help": "ʜᴇʏ {mention}! ɪғ ʏᴏᴜ ɴᴇᴇᴅ ʜᴇʟᴘ, ᴄᴏɴᴛᴀᴄᴛ ᴛʜᴇ ᴀᴅᴍɪɴ: @Just_astha",
-    "commands": "(Quote start) ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs (Quote end)\n\n/clone · /commands · /settings\n/about · /help · /broadcast · /users\n/stats · /logs · /ping · /restart\n/maintenance · /setmaintenance\n/setstart · /setabout · /sethelp\n/setimage · /setbuttons · /setfooter\n/setquote · /setname · /clones\n/stopclone · /restartclone · /cloneedit\n/cloneinfo · /texts · /edittext",
+    "commands": "(Quote start) ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs (Quote end)\n\n/clone · /commands · /settings\n/about · /help · /broadcast · /users\n/stats · /logs · /ping · /restart\n/maintenance · /setmaintenance\n/setstart · /setabout · /sethelp\n/setimage · /setbuttons · /setfooter\n/setquote · /setname · /clones\n/stopclone · /restartclone · /clonedit\n/cloneinfo · /texts · /edittext",
     "settings": "╭───────────────⍟\n├➤ ʙᴏᴛ sᴇᴛᴛɪɴɢs\n├➤ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ʙᴏᴛ ᴘʀᴇғᴇʀᴇɴᴄᴇs ʙᴇʟᴏᴡ.\n╰───────────────⍟",
     "broadcast": "ʙʀᴏᴀᴅᴄᴀsᴛ ᴀɴᴅ ᴘʀᴏᴍᴏᴛᴇ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ {owner} sᴇɴᴘᴀɪ",
     "users": "ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴜsᴇʀs sᴇɴᴘᴀɪ",
@@ -122,7 +122,8 @@ async def broadcast(update,context):
     await simple_menu(update,context,"broadcast",[
         [("· ᴛᴇxᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ·","broadcast:text"),("· ᴍᴇᴅɪᴀ ʙʀᴏᴀᴅᴄᴀsᴛ ·","broadcast:media")],
         [("· ᴀʟʟ ᴜsᴇʀs ·","broadcast:all"),("· sᴄʜᴇᴅᴜʟᴇ ·","broadcast:schedule")],
-        [("· ʀᴇᴘᴏʀᴛ ·","broadcast:report"),("· ʙᴀᴄᴋ ·","admin:back")],
+        [("· ʀᴇᴘᴏʀᴛ ·","broadcast:report"),("· Qᴜᴇᴜᴇ ·","broadcast:queue")],
+        [("· ʙᴀᴄᴋ ·","admin:back")],
     ])
 async def users(update,context):
     await simple_menu(update,context,"users",[
@@ -262,6 +263,10 @@ async def callback_router(update,context):
     if data not in {"admin:about","admin:channel"} and not _is_admin(q.from_user.id,context):
         await q.answer("Owner / Admin only.",show_alert=True)
         return
+    if data.startswith("broadcast:"):
+        from .broadcasts import broadcast_callback
+        await broadcast_callback(update,context)
+        return
     await q.answer()
     if data.startswith("admin:"):
         key=data.split(":")[1]
@@ -327,11 +332,9 @@ async def callback_router(update,context):
             rows=await context.application.bot_data["db"].require().fetch("SELECT created_at,details FROM manager_activity WHERE action='broadcast' ORDER BY created_at DESC LIMIT 10")
             report="ʙʀᴏᴀᴅᴄᴀsᴛ ʜɪsᴛᴏʀʏ\\n\\n"+("\\n".join(f"{r['created_at']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴇᴄᴏʀᴅs.")
             await _send(context,q.message.chat_id,report)
-        elif data=="broadcast:schedule":
-            await _send(context,q.message.chat_id,"sᴄʜᴇᴅᴜʟᴇᴅ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ɴᴏᴛ ᴇɴᴀʙʟᴇᴅ ʏᴇᴛ. ᴜsᴇ ᴛᴇxᴛ ᴏʀ ᴍᴇᴅɪᴀ ʙʀᴏᴀᴅᴄᴀsᴛ ғᴏʀ ɪᴍᴍᴇᴅɪᴀᴛᴇ ᴅᴇʟɪᴠᴇʀʏ.")
-        else:
-            context.user_data["broadcast_mode"]=data.split(":")[1]
-            await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀsᴛ. ᴛʜɪs ᴡɪʟʟ ɢᴏ ᴛᴏ ᴀʟʟ ᴜsᴇʀs ᴡʜᴏ sᴛᴀʀᴛᴇᴅ ᴀ ᴄʟᴏɴᴇ.")
+        from .broadcasts import broadcast_callback
+        await broadcast_callback(update,context)
+        return
     elif data.startswith("logs:"):
         action=data.split(":")[1]
         db=context.application.bot_data["db"]
@@ -352,27 +355,8 @@ async def callback_router(update,context):
         body+="\\n".join(f"{r['created_at']} · {r['action']} · {r['details']}" for r in rows) if rows else "ɴᴏ ʟᴏɢ ᴇɴᴛʀɪᴇs ғᴏᴜɴᴅ."
         await _send(context,q.message.chat_id,body)
 async def capture_broadcast(update,context):
-    mode=context.user_data.pop("broadcast_mode",None)
-    if not mode or not update.effective_message: return
-    if not _is_admin(update.effective_user.id,context): return
-    rows=await context.application.bot_data["db"].require().fetch("SELECT user_id FROM bot_users")
-    sent=failed=0
-    for row in rows:
-        try:
-            if update.effective_message.text:
-                await send_branded(context.bot,row["user_id"],update.effective_message.text,
-                    image_url=_image(context),image_path=context.application.bot_data.get("image_path"),
-                    small_caps=context.application.bot_data.get("small_caps",True),
-                    footer_message=await context.application.bot_data["db"].get_setting("branding.footer",FOOTER_DEFAULT))
-            elif update.effective_message.photo:
-                await send_branded(context.bot,row["user_id"],update.effective_message.caption or " ",
-                    image_url=_image(context),image_path=context.application.bot_data.get("image_path"),
-                    small_caps=context.application.bot_data.get("small_caps",True),
-                    footer_message=await context.application.bot_data["db"].get_setting("branding.footer",FOOTER_DEFAULT))
-            sent+=1
-        except Exception: failed+=1
-    await context.application.bot_data["db"].require().execute("INSERT INTO manager_activity(actor_id,action,details,level) VALUES($1,$2,$3,$4)",update.effective_user.id,"broadcast","sent="+str(sent)+", failed="+str(failed),"info")
-    await _send(context,update.effective_chat.id,f"ʙʀᴏᴀᴅᴄᴀsᴛ ғɪɴɪsʜᴇᴅ. sᴇɴᴛ: {sent} · ғᴀɪʟᴇᴅ: {failed}")
+    from .broadcasts import capture_broadcast_message
+    await capture_broadcast_message(update,context)
 async def restart(update,context):
     if not await _owner_admin(update,context): return
     markup=_markup([[("· ʀᴇsᴛᴀʀᴛ ᴀɢᴀɪɴ ·","restart:again"),("· sᴛᴏᴘ ·","restart:stop")]])
@@ -419,11 +403,18 @@ async def capture_user_action(update,context):
     db=context.application.bot_data["db"]
     clone_id=context.application.bot_data["clone_id"]
     if action in {"block","unblock"}:
-        banned=action=="block"
-        await db.require().execute("""INSERT INTO bot_users(clone_id,user_id,is_banned) VALUES($1,$2,$3)
-            ON CONFLICT(clone_id,user_id) DO UPDATE SET is_banned=EXCLUDED.is_banned""",clone_id,target,banned)
-        result_word="ʙʟᴏᴄᴋᴇᴅ" if banned else "ᴜɴʙʟᴏᴄᴋᴇᴅ"
-        await _send(context,update.effective_chat.id,f"ᴜsᴇʀ {target} ʜᴀs ʙᴇᴇɴ {result_word}.")
+        if action=="block":
+            await db.require().execute(
+                """INSERT INTO bot_user_blocks(user_id,blocked_by) VALUES($1,$2)
+                   ON CONFLICT(user_id) DO UPDATE SET blocked_by=EXCLUDED.blocked_by,blocked_at=NOW()""",
+                target, update.effective_user.id,
+            )
+            await db.require().execute("UPDATE bot_users SET is_banned=TRUE WHERE user_id=$1",target)
+        else:
+            await db.require().execute("DELETE FROM bot_user_blocks WHERE user_id=$1",target)
+            await db.require().execute("UPDATE bot_users SET is_banned=FALSE WHERE user_id=$1",target)
+        result_word="ʙʟᴏᴄᴋᴇᴅ" if action=="block" else "ᴜɴʙʟᴏᴄᴋᴇᴅ"
+        await _send(context,update.effective_chat.id,f"ᴜsᴇʀ {target} ʜᴀs ʙᴇᴇɴ {result_word} ɢʟᴏʙᴀʟʟʏ.")
     else:
         rows=await db.require().fetch("SELECT clone_id,first_seen,last_seen,is_banned FROM bot_users WHERE user_id=$1 ORDER BY last_seen DESC LIMIT 20",target)
         if not rows:
@@ -462,5 +453,5 @@ def add_admin_handlers(app):
     app.add_handler(CallbackQueryHandler(restart_callback,pattern=r"^restart:(again|stop)$"))
     app.add_handler(CallbackQueryHandler(editsetting_callback,pattern=r"^editsetting:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, capture_user_action),group=-5)
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, capture_broadcast),group=-4)
+    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, capture_broadcast),group=-4)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _save_input),group=-3)

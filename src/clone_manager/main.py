@@ -16,13 +16,22 @@ async def post_init(app):
     s=app.bot_data["settings"]
     db=Database(s.database_url)
     await db.connect()
-    await db.init_schema(Path("migrations/001_initial.sql").read_text(encoding="utf-8"))
+    for migration in sorted(Path("migrations").glob("*.sql")):
+        await db.init_schema(migration.read_text(encoding="utf-8"))
+    # Scheduled sends interrupted by a process restart are safely retried.
+    await db.require().execute("UPDATE scheduled_broadcasts SET status='pending' WHERE status='sending'")
     app.bot_data["db"]=db
     if not await db.get_setting("branding.footer",""):
         await db.set_setting("branding.footer",'(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)')
     app.bot_data["image_url"]=await db.get_setting("branding.image_url",app.bot_data["image_url"])
     from .formatting import set_quote_enabled
     set_quote_enabled((await db.get_setting("branding.quote_enabled","true")).lower() in {"on","true"})
+    import asyncio
+    app.bot_data["broadcast_lock"] = asyncio.Lock()
+    if app.job_queue is None:
+        raise RuntimeError("PTB JobQueue is unavailable; install the project dependencies.")
+    from .broadcasts import scheduled_broadcast_worker
+    app.job_queue.run_repeating(scheduled_broadcast_worker, interval=15, first=5, name="scheduled-broadcasts")
 
 async def post_shutdown(app):
     db=app.bot_data.get("db")

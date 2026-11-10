@@ -37,7 +37,7 @@ Private Telegram control bot for provisioning and managing the separate File Sha
 | `/clones` | Clone dashboard with live Docker status |
 | `/stopclone` | Select and stop a clone |
 | `/restartclone` | Select and restart a clone |
-| `/cloneedit` | Edit a clone-specific message override |
+| `/clonedit` | Edit a clone-specific message override |
 | `/cloneinfo` | View clone details |
 | `/texts` | Browse editable manager and clone messages |
 | `/edittext` | Edit a selected message |
@@ -70,8 +70,8 @@ python -m clone_manager.main
 ```
 
 ## Current implementation boundaries
-- Broadcast scheduling is shown as a menu item but is not yet implemented; text and media broadcasts are immediate.
-- `/cloneedit` currently edits clone-specific message overrides; editing repository, hosting or encrypted token settings is not implemented.
+- Text and media broadcasts support preview, immediate delivery, scheduled delivery in Asia/Kolkata time, queue inspection/cancellation and delivery reports. Scheduled payloads persist in PostgreSQL.
+- `/clonedit` is the clone configuration editor. Docker is the configured deployment backend; external hosting-provider migration requires a provider adapter and credentials.
 - Clone provisioning requires a working Docker daemon, configured private images and GHCR credentials when applicable.
 
 The Docker socket is highly privileged. Keep this bot private, restrict administrators, protect the host and secret directory, and never log plaintext BotFather tokens.
