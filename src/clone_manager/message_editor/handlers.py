@@ -225,7 +225,7 @@ async def capture_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.application.bot_data["db"].set_text(target_clone,key,update.effective_message.text)
     context.user_data.pop("editing_text_key", None)
     await send_branded(context.bot, update.effective_chat.id,
-                       f"Saved `{key}`. Preview it using `/previewtext {key}`.",
+                       f"Saved `{key}` successfully.",
                        image_url=context.application.bot_data["image_url"],
                        image_path=context.application.bot_data["image_path"],
                        small_caps=context.application.bot_data["small_caps"])
@@ -235,10 +235,4 @@ def add_editor_handlers(app):
     app.add_handler(CommandHandler("texts", texts))
     app.add_handler(CallbackQueryHandler(select_template_callback,pattern=r"^textedit:"))
     app.add_handler(CommandHandler("edittext", edittext))
-    app.add_handler(CommandHandler("previewtext", previewtext))
-    app.add_handler(CommandHandler("resettext", resettext))
-    app.add_handler(CommandHandler("buttons", buttons))
-    app.add_handler(CommandHandler("addbutton", addbutton))
-    app.add_handler(CommandHandler("editbutton", editbutton))
-    app.add_handler(CommandHandler("delbutton", delbutton))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, capture_edit), group=-1)
