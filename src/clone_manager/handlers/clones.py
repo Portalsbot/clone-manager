@@ -201,7 +201,7 @@ async def restartclone(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if not context.args: return await _clone_action_menu(update,context,"restart")
     else:
         row=await context.application.bot_data["db"].require().fetchrow("SELECT owner_id,container_id FROM clone_instances WHERE clone_id=$1",context.args[0])
-        if not row or row["owner_id"]!=update.effective_user.id: body="Clone not found or not owned by you."
+        if not row or row["owner_id"]!=context.application.bot_data["owner_id"]: body="Clone not found or not owned by you."
         else:
             await context.application.bot_data["provisioner"].restart(row["container_id"])
             await context.application.bot_data["db"].require().execute("UPDATE clone_instances SET status='running',updated_at=NOW() WHERE clone_id=$1",context.args[0]); body="Clone restarted."
@@ -216,7 +216,7 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if not context.args:
         rows=await context.application.bot_data["db"].require().fetch(
             "SELECT clone_id,bot_username,status FROM clone_instances WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 50",
-            update.effective_user.id)
+            context.application.bot_data["owner_id"])
         if not rows:
             await _send(update,context,"ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ ᴄʀᴇᴀᴛᴇᴅ ᴀɴʏ ᴄʟᴏɴᴇs ʏᴇᴛ.")
             return
