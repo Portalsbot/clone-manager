@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 from pathlib import Path
+from telegram import BotCommand, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CallbackQueryHandler, MessageHandler, filters
 from .config import Settings
 from .database import Database
@@ -39,6 +40,39 @@ async def post_init(app):
             f"scheduled id={item['id']} failed after restart; delivery outcome is unknown",
         )
     app.bot_data["db"]=db
+    public_commands = [BotCommand("start", "Open the private bot menu")]
+    admin_commands = [
+        BotCommand("clone", "Create a new bot clone"),
+        BotCommand("clones", "View and manage bot clones"),
+        BotCommand("stopclone", "Stop a clone"),
+        BotCommand("restartclone", "Restart a clone"),
+        BotCommand("clonedit", "Edit clone configuration"),
+        BotCommand("cloneinfo", "View detailed clone information"),
+        BotCommand("about", "About Clone Manager"),
+        BotCommand("help", "Contact administrator for help"),
+        BotCommand("commands", "List available commands"),
+        BotCommand("settings", "Open manager settings"),
+        BotCommand("broadcast", "Create an immediate or scheduled broadcast"),
+        BotCommand("users", "Manage registered users"),
+        BotCommand("stats", "View manager statistics"),
+        BotCommand("logs", "View activity and error logs"),
+        BotCommand("ping", "Check bot response"),
+        BotCommand("restart", "Restart or stop the manager"),
+        BotCommand("maintenance", "Open maintenance controls"),
+        BotCommand("setmaintenance", "Manage maintenance mode"),
+        BotCommand("setstart", "Edit Start message"),
+        BotCommand("setabout", "Edit About message"),
+        BotCommand("sethelp", "Edit Help message"),
+        BotCommand("setimage", "Change branding image URL"),
+        BotCommand("setbuttons", "Edit inline buttons"),
+        BotCommand("setfooter", "Edit message footer"),
+        BotCommand("setquote", "Toggle quote markup"),
+        BotCommand("setname", "Change bot display name"),
+    ]
+    await app.bot.set_my_commands(public_commands)
+    for user_id in {owner_id, *admin_ids}:
+        await app.bot.set_my_commands(public_commands + admin_commands,
+            scope=BotCommandScopeChat(chat_id=user_id))
     if not await db.get_setting("branding.footer",""):
         await db.set_setting("branding.footer",'(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)')
     app.bot_data["image_url"]=await db.get_setting("branding.image_url",app.bot_data["image_url"])
