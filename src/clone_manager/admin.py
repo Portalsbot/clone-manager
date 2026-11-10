@@ -104,7 +104,15 @@ async def help_command(update,context):
     if not await _owner_admin(update,context): return
     body=await context.application.bot_data["db"].get_setting("message.help",MENU_TEXT["help"])
     body=body.format(mention=update.effective_user.mention_html())
-    await _send(context,update.effective_chat.id,body,_markup([[("· ᴀʙᴏᴜᴛ ·","admin:about"),("· ᴄʜᴀɴɴᴇʟ ·","admin:channel")],[("· ᴄᴏᴍᴍᴀɴᴅs ·","admin:commands")]]))
+    saved_buttons=await context.application.bot_data["db"].get_setting("branding.buttons_json","")
+    markup=_markup([[("· ᴀʙᴏᴜᴛ ·","admin:about"),("· ᴄʜᴀɴɴᴇʟ ·","admin:channel")],[("· ᴄᴏᴍᴍᴀɴᴅs ·","admin:commands")]])
+    if saved_buttons:
+        try:
+            from .branding import keyboard_from_buttons
+            markup=keyboard_from_buttons(json.loads(saved_buttons),small_caps=True) or markup
+        except Exception:
+            pass
+    await _send(context,update.effective_chat.id,body,markup)
 async def commands(update,context):
     if not await _owner_admin(update,context): return
     await _send(context,update.effective_chat.id,MENU_TEXT["commands"])
