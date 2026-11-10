@@ -253,6 +253,8 @@ async def editsetting_callback(update,context):
         if pending["key"]=="branding.image_url":
             context.application.bot_data["image_url"]=value
             context.application.bot_data["image_path"]=None
+            # Keep future clone deployments aligned with the manager's live branding setting.
+            context.application.bot_data["provisioner"].branding_url=value
         if pending["key"]=="branding.quote_enabled":
             from .formatting import set_quote_enabled
             set_quote_enabled(value.lower() in {"on","true"})
