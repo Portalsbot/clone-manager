@@ -42,8 +42,37 @@ def parse_scheduled_at(value: str, *, now: datetime | None = None) -> datetime:
 
 
 def serialize_message(message) -> dict:
+    buttons = []
+    if message.reply_markup and getattr(message.reply_markup, "inline_keyboard", None):
+        for row in message.reply_markup.inline_keyboard:
+            safe = [{"text": button.text, "url": button.url} for button in row
+                    if button.url and button.url.startswith(("https://", "http://"))]
+            if safe:
+                buttons.append(safe)
+
+    def extract_buttons(value):
+        kept, parsed = [], []
+        for line in (value or "").splitlines():
+            marker = line.strip()
+            if marker.lower().startswith("[button]"):
+                spec = marker[len("[button]"):].strip()
+                if "|" not in spec:
+                    raise ValueError("Button syntax: [button] LABEL | https://URL")
+                label, url = [part.strip() for part in spec.split("|", 1)]
+                if not label or len(label) > 64 or not url.startswith(("https://", "http://")):
+                    raise ValueError("Broadcast buttons need a label and an HTTP(S) URL.")
+                parsed.append({"text": label, "url": url})
+            else:
+                kept.append(line)
+        if parsed:
+            buttons.extend([[item] for item in parsed])
+        return "\n".join(kept).strip()
+
     if message.text:
-        return {"kind": "text", "text": message.text}
+        text = extract_buttons(message.text)
+        if not text:
+            raise ValueError("Broadcast text cannot be empty after button definitions.")
+        return {"kind": "text", "text": text, "buttons": buttons}
     for media_type in MEDIA_METHODS:
         media = getattr(message, media_type, None)
         if not media:
@@ -54,10 +83,10 @@ def serialize_message(message) -> dict:
             "kind": "media",
             "media_type": media_type,
             "file_id": media.file_id,
-            "caption": message.caption or "",
+            "caption": extract_buttons(message.caption or ""),
+            "buttons": buttons,
         }
-    raise ValueError("sᴇɴᴅ ᴛᴇxᴛ ᴏʀ sᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ (ᴘʜᴏᴛᴏ, ᴠɪᴅᴇᴏ, ᴅᴏᴄᴜᴍᴇɴᴛ, ᴀᴜᴅɪᴏ, ᴀɴɪᴍᴀᴛɪᴏɴ, ᴠᴏɪᴄᴇ, ᴠɪᴅᴇᴏ ɴᴏᴛᴇ, sᴛɪᴄᴋᴇʀ).")
-
+    raise ValueError("sᴇɴᴅ ᴛᴇxᴛ ᴏʀ sᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ (ᴘʜᴏᴛᴏ, ᴠɪᴅᴇᴏ, ᴅᴏᴄᴜᴍᴇɴᴛ, ᴀᴜᴅɪᴏ, ᴀɴɪᴍᴀᴛɪᴏɴ, ᴠᴏɪᴄᴇ, ᴠɪᴅᴇᴏ ɴᴏᴛᴇ, sᴛɪᴄᴋᴇʀ).
 
 def _is_admin(user_id: int, context) -> bool:
     return user_id == context.application.bot_data["owner_id"] or user_id in context.application.bot_data.get("admins", set())
@@ -95,12 +124,15 @@ async def _deliver_one(context, chat_id: int, payload: dict) -> None:
     db = context.application.bot_data["db"]
     footer = await db.get_setting("branding.footer", '(LINK url="https://t.me/just_astha")ᴄʟɪᴄᴋ ʜᴇʀᴇ ᴛᴏ ᴄʜᴀᴛ ᴡɪᴛʜ ᴍᴇ(/LINK)')
     if payload["kind"] == "text":
+        rows = [[InlineKeyboardButton(item["text"], url=item["url"]) for item in row]
+                for row in payload.get("buttons", [])]
+        markup = InlineKeyboardMarkup(rows) if rows else None
         await send_branded(
             context.bot, chat_id, payload["text"],
             image_url=context.application.bot_data["image_url"],
             image_path=context.application.bot_data.get("image_path"),
             small_caps=context.application.bot_data.get("small_caps", True),
-            footer_message=footer,
+            reply_markup=markup, footer_message=footer,
         )
         return
     media_type = payload["media_type"]
@@ -110,7 +142,10 @@ async def _deliver_one(context, chat_id: int, payload: dict) -> None:
     if caption and media_type not in {"sticker", "video_note"}:
         args["caption"] = render_text(caption, context.application.bot_data.get("small_caps", True))
         args["parse_mode"] = "HTML"
-    args["reply_markup"] = InlineKeyboardMarkup([[InlineKeyboardButton("· ᴄʟᴏsᴇ ·", callback_data="branding:close")]])
+    button_rows = [[InlineKeyboardButton(item["text"], url=item["url"]) for item in row]
+                   for row in payload.get("buttons", [])]
+    button_rows.append([InlineKeyboardButton("· ᴄʟᴏsᴇ ·", callback_data="branding:close")])
+    args["reply_markup"] = InlineKeyboardMarkup(button_rows)
     await send_branded(
         context.bot, chat_id, "ᴍᴇᴅɪᴀ ʙʀᴏᴀᴅᴄᴀsᴛ",
         image_url=context.application.bot_data["image_url"],
