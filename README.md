@@ -23,6 +23,7 @@ Private Telegram control bot for provisioning and managing the separate File Sha
 | `/stats` | User, clone, period and system-health statistics |
 | `/logs` | User, clone, broadcast, error and admin activity logs |
 | `/ping` | Measured response latency |
+| `/diagnostics` | Check Telegram, PostgreSQL, Docker daemon, product images and secret-path permissions |
 | `/restart` | Restart and role-aware stop controls |
 | `/maintenance` | Enable, disable and inspect maintenance mode |
 | `/setmaintenance` | Maintenance notice |
