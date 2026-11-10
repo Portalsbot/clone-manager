@@ -15,7 +15,7 @@ class DockerProvisioner:
         self.client=docker.from_env()
         self.secret_root=Path(os.getenv("CLONE_SECRET_DIR","/var/lib/clone-manager/secrets"))
         self.database_url=os.environ["DATABASE_URL"]
-        self.branding_url=os.getenv("BRANDING_IMAGE_URL","https://raw.githubusercontent.com/Portalsbot/image/main/photo_2026-11-01_20-42-48.jpg")
+        self.branding_url=os.getenv("BRANDING_IMAGE_URL","https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png")
         self.file_image=os.getenv("FILE_SHARING_IMAGE","")
         self.link_image=os.getenv("LINK_SHARING_IMAGE","")
         self.network=os.getenv("CLONE_DOCKER_NETWORK") or None
