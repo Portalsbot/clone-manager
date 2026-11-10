@@ -57,6 +57,7 @@ async def post_init(app):
         BotCommand("stats", "View manager statistics"),
         BotCommand("logs", "View activity and error logs"),
         BotCommand("ping", "Check bot response"),
+        BotCommand("diagnostics", "Check Telegram, database and Docker host"),
         BotCommand("restart", "Restart or stop the manager"),
         BotCommand("maintenance", "Open maintenance controls"),
         BotCommand("setmaintenance", "Manage maintenance mode"),
