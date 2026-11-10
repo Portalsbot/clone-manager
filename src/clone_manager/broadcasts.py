@@ -139,15 +139,12 @@ async def _deliver_one(context, chat_id: int, payload: dict) -> None:
     method_name, argument_name = MEDIA_METHODS[media_type]
     args = {"chat_id": chat_id, argument_name: payload["file_id"]}
     caption = payload.get("caption", "")
-    if caption and media_type not in {"sticker", "video_note"}:
-        args["caption"] = render_text(caption, context.application.bot_data.get("small_caps", True))
-        args["parse_mode"] = "HTML"
     button_rows = [[InlineKeyboardButton(item["text"], url=item["url"]) for item in row]
                    for row in payload.get("buttons", [])]
     button_rows.append([InlineKeyboardButton("· ᴄʟᴏsᴇ ·", callback_data="branding:close")])
     args["reply_markup"] = InlineKeyboardMarkup(button_rows)
     await send_branded(
-        context.bot, chat_id, "ᴍᴇᴅɪᴀ ʙʀᴏᴀᴅᴄᴀsᴛ",
+        context.bot, chat_id, caption or "ᴍᴇᴅɪᴀ ʙʀᴏᴀᴅᴄᴀsᴛ",
         image_url=context.application.bot_data["image_url"],
         image_path=context.application.bot_data.get("image_path"),
         small_caps=context.application.bot_data.get("small_caps", True),
