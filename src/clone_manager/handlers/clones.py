@@ -230,7 +230,9 @@ async def cloneinfo(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
 async def cloneedit(update:Update,context:ContextTypes.DEFAULT_TYPE):
     """Platform-owner remote message override for an existing clone."""
-    if update.effective_user.id != context.application.bot_data["owner_id"]: return
+    if not _allowed(update.effective_user.id,context):
+        await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ.")
+        return
     if len(context.args)!=2:
         body="Usage: `/cloneedit CLONE_ID TEMPLATE_KEY`"
     else:
@@ -247,7 +249,9 @@ async def cloneedit(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await _send(update,context,body)
 
 async def clonepreview(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != context.application.bot_data["owner_id"]: return
+    if not _allowed(update.effective_user.id,context):
+        await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ.")
+        return
     if len(context.args)!=2: body="Usage: `/clonepreview CLONE_ID TEMPLATE_KEY`"
     else:
         clone_id,key=context.args
