@@ -70,7 +70,7 @@ async def post_init(app):
         BotCommand("setname", "Change bot display name"),
     ]
     await app.bot.set_my_commands(public_commands)
-    for user_id in {owner_id, *admin_ids}:
+    for user_id in {app.bot_data["owner_id"], *app.bot_data["admins"]}:
         await app.bot.set_my_commands(public_commands + admin_commands,
             scope=BotCommandScopeChat(chat_id=user_id))
     if not await db.get_setting("branding.footer",""):
