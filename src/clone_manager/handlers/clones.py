@@ -45,6 +45,10 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await _send(update,context,body,markup)
 
 async def clone(update:Update,context:ContextTypes.DEFAULT_TYPE):
+    for state in ("pending_clone_edit","pending_clone_product","editing_text_key","editing_clone_id",
+                  "pending_setting","pending_text_editor","awaiting_text_draft","user_action",
+                  "broadcast_mode","pending_broadcast","awaiting_broadcast_time"):
+        context.user_data.pop(state,None)
     if not _allowed(update.effective_user.id,context):
         await _send(update,context,"ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ʀᴇsᴛʀɪᴄᴛᴇᴅ ᴛᴏ ᴏᴡɴᴇʀ / ᴀᴅᴍɪɴ.")
         return
@@ -464,6 +468,7 @@ async def clone_edit_callback(update,context):
     if not _allowed(q.from_user.id,context): await q.answer("Owner / Admin only.",show_alert=True); return
     await q.answer(); parts=q.data.split(":"); db=context.application.bot_data["db"]
     if parts[1]=="edit":
+        context.user_data.pop("pending_clone_edit",None)
         row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",parts[2],context.application.bot_data["owner_id"])
         if not row: await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
         await _show_clone_edit_menu(update,context,row)

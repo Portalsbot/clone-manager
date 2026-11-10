@@ -162,6 +162,10 @@ async def ping(update,context):
     except Exception: pass
 async def _edit_command(update,context,command):
     if not await _owner_admin(update,context): return
+    for state in ("pending_setting","pending_text_editor","awaiting_text_draft","user_action",
+                  "pending_clone_edit","pending_clone_product","editing_text_key","editing_clone_id",
+                  "broadcast_mode","pending_broadcast","awaiting_broadcast_time"):
+        context.user_data.pop(state,None)
     key,label=EDITABLE[command]
     defaults={
         "message.start":"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {usermention} ~ (Quote end)\\n\\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)",
@@ -326,6 +330,10 @@ async def callback_router(update,context):
             value=await db.require().fetchval("SELECT COUNT(DISTINCT user_id) FROM bot_users WHERE last_seen>NOW()-INTERVAL '7 days'")
             await _send(context,q.message.chat_id,f"ᴀᴄᴛɪᴠᴇ ᴜsᴇʀs ɪɴ 7 ᴅᴀʏs: {value}")
         elif action in {"search","info","block","unblock"}:
+            for state in ("pending_setting","pending_text_editor","awaiting_text_draft","pending_clone_edit",
+                          "pending_clone_product","editing_text_key","editing_clone_id","broadcast_mode",
+                          "pending_broadcast","awaiting_broadcast_time"):
+                context.user_data.pop(state,None)
             context.user_data["user_action"]=action
             await _send(context,q.message.chat_id,"sᴇɴᴅ ᴛʜᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴜsᴇʀ ɪᴅ.")
         else:

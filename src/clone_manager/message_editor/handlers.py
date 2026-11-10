@@ -31,6 +31,9 @@ def _text_editor_markup():
     ])
 
 async def _begin_template_edit(update,context,key,chat_id=None):
+    for state in ("pending_setting","user_action","pending_clone_edit","pending_clone_product",
+                  "editing_text_key","editing_clone_id","broadcast_mode","pending_broadcast","awaiting_broadcast_time"):
+        context.user_data.pop(state,None)
     defaults=context.application.bot_data["defaults"]
     if key not in defaults:
         await send_branded(context.bot,chat_id or update.effective_chat.id,"ᴜɴᴋɴᴏᴡɴ ᴍᴇssᴀɢᴇ ᴋᴇʏ. ᴜsᴇ /texts.",

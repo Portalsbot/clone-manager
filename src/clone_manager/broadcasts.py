@@ -226,6 +226,10 @@ async def broadcast_callback(update, context) -> None:
     await q.answer()
     chat_id = q.message.chat_id
     data = q.data
+    if data in {"broadcast:text", "broadcast:media", "broadcast:all", "broadcast:schedule"}:
+        for state in ("pending_setting","pending_text_editor","awaiting_text_draft","user_action",
+                      "pending_clone_edit","pending_clone_product","editing_text_key","editing_clone_id"):
+            context.user_data.pop(state,None)
     if data == "broadcast:text":
         context.user_data["broadcast_mode"] = "text"
         context.user_data.pop("pending_broadcast", None)
