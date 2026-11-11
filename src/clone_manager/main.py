@@ -7,6 +7,7 @@ from pathlib import Path
 from telegram import BotCommand, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CallbackQueryHandler, MessageHandler, filters
 from .config import Settings
+from .paths import APP_DATA_DIR
 from .database import Database
 from .defaults import DEFAULT_MESSAGES
 from .provisioner import RenderProvisioner
@@ -21,7 +22,7 @@ async def post_init(app):
     s=app.bot_data["settings"]
     db=Database(s.database_url)
     await db.connect()
-    migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
+    migrations_dir = APP_DATA_DIR / "migrations"
     migration_files = sorted(migrations_dir.glob("*.sql"))
     if not migration_files:
         raise RuntimeError(f"No database migrations found in {migrations_dir}")

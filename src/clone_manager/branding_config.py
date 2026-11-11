@@ -1,8 +1,9 @@
 """Command-wise editable response and local branding asset defaults."""
 from __future__ import annotations
 import json
-from pathlib import Path
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+from .paths import APP_DATA_DIR
+
+_REPO_ROOT = APP_DATA_DIR
 _RESPONSE_FILE = _REPO_ROOT / "config" / "command_responses.json"
 IMAGE_PATH = _REPO_ROOT / "assets" / "branding.jpg"
 if not _RESPONSE_FILE.is_file():
