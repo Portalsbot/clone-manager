@@ -209,6 +209,7 @@ class RenderProvisioner:
             "image": self._image_configuration(image_ref, include_owner=True),
             "envVars": environment,
             "serviceDetails": {
+                "runtime": "image",
                 "region": (region or self.region).lower(),
                 "plan": (plan or self.plan).lower(),
                 "numInstances": 1,
