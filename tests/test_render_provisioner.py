@@ -77,6 +77,7 @@ async def test_create_file_worker_sends_render_background_worker_payload(monkeyp
         "imagePath": "ghcr.io/portalsbot/file-share-bot:latest",
         "registryCredentialId": "rc_test_registry",
     }
+    assert captured["payload"]["serviceDetails"]["runtime"] == "image"
     assert captured["payload"]["serviceDetails"]["region"] == "singapore"
     assert captured["payload"]["serviceDetails"]["plan"] == "starter"
 
