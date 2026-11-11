@@ -112,13 +112,20 @@ async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
     provisioner=context.application.bot_data["provisioner"]
     repo_url=provisioner.repository_for(product)
     image_ref=provisioner.image_for(product)
+    managed_environment={}
+    if product=="link":
+        managed_environment["SHORTENER_ENCRYPTION_KEY"]=Fernet.generate_key().decode("ascii")
+    encrypted_environment=(
+        cipher.encrypt(json.dumps(managed_environment).encode()).decode()
+        if managed_environment else None
+    )
     await db.require().execute(
         """INSERT INTO clone_instances(
             clone_id,owner_id,product,bot_id,bot_username,bot_name,repository_url,image_ref,
-            hosting_provider,encrypted_token,status
-        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'render',$9,'provisioning')""",
+            hosting_provider,encrypted_token,encrypted_environment,status
+        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'render',$9,$10,'provisioning')""",
         clone_id,owner_id,product,me.id,me.username or str(me.id),me.first_name,
-        repo_url,image_ref,encrypted)
+        repo_url,image_ref,encrypted,encrypted_environment)
     try:
         render_service_id=await provisioner.create(product,clone_id,token,owner_id,image_ref=image_ref)
         await db.require().execute("UPDATE clone_instances SET render_service_id=$1,status='provisioning',updated_at=NOW() WHERE clone_id=$2",render_service_id,clone_id)
@@ -352,7 +359,7 @@ async def _show_clone_edit_menu(update,context,row):
 
 
 def _parse_environment(text:str)->dict[str,str]:
-    protected={"BOT_TOKEN","DATABASE_URL","OWNER_ID","CLONE_ID","CONFIG_FILE","BRANDING_IMAGE_URL"}
+    protected={"BOT_TOKEN","DATABASE_URL","OWNER_ID","ADMINS","CLONE_ID","CONFIG_FILE","BRANDING_IMAGE_URL","BRANDING_IMAGE_PATH","SHORTENER_ENCRYPTION_KEY"}
     result={}
     for line in text.splitlines():
         line=line.strip()
@@ -411,7 +418,7 @@ async def _start_clone_edit(update,context,clone_id,field):
       "name":"sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴅɪsᴘʟᴀʏ ɴᴀᴍᴇ (ᴍᴀx 64 ᴄʜᴀʀᴀᴄᴛᴇʀs).",
       "token":"sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ʙᴏᴛғᴀᴛʜᴇʀ ᴛᴏᴋᴇɴ ғᴏʀ ᴛʜᴇ sᴀᴍᴇ ʙᴏᴛ. ᴛʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ.",
       "repository":"sᴇɴᴅ ᴛʜᴇ ᴘʀɪᴠᴀᴛᴇ GɪᴛHᴜʙ ʀᴇᴘᴏsɪᴛᴏʀʏ URL ғᴏʀ ᴛʜɪs ᴘʀᴏᴅᴜᴄᴛ. Tʜᴇ ᴘʀᴏᴅᴜᴄᴛ's ᴅᴇғᴀᴜʟᴛ ᴘᴀᴄᴋᴀɢᴇ ɪs ᴍᴀᴘᴘᴇᴅ ᴛᴏ ɪᴛs ᴄᴏʀʀᴇᴄᴛ GHCR ɪᴍᴀɢᴇ.",
-      "hosting":"sᴇɴᴅ region=singapore ᴀɴᴅ plan=starter ᴏɴ sᴇᴘᴀʀᴀᴛᴇ ʟɪɴᴇs. Vᴀʟɪᴅ ʀᴇɢɪᴏɴs: singapore, oregon, ohio, frankfurt, virginia.",
+      "hosting":"sᴇɴᴅ plan=starter ᴛᴏ ᴄʜᴀɴɢᴇ ᴛʜᴇ ᴄᴏᴍᴘᴜᴛᴇ ᴘʟᴀɴ. Tʜᴇ ʀᴇɢɪᴏɴ ɪs sᴇᴛ ʙʏ RENDER_REGION ɪɴ ᴛʜᴇ ᴍᴀɴᴀɢᴇʀ's ᴇɴᴠɪʀᴏɴᴍᴇɴᴛ.",
       "environment":"sᴇɴᴅ ᴄᴜsᴛᴏᴍ ᴠᴀʀɪᴀʙʟᴇs ᴀs KEY=VALUE, ᴏɴᴇ ᴘᴇʀ ʟɪɴᴇ. ᴄᴏʀᴇ sᴇᴄʀᴇᴛs ᴀʀᴇ ᴘʀᴏᴛᴇᴄᴛᴇᴅ; ᴠᴀʟᴜᴇs ᴀʀᴇ ᴇɴᴄʀʏᴘᴛᴇᴅ."
     }
     await _send(update,context,prompts[field],InlineKeyboardMarkup([[InlineKeyboardButton("· ᴄᴀɴᴄᴇʟ ·",callback_data=f"clone:edit:{clone_id}")]]))
@@ -472,17 +479,22 @@ async def _capture_clone_edit(update,context,pending):
         items={}
         for line in value.splitlines():
             if not line.strip(): continue
-            if "=" not in line: await _send(update,context,"ᴜsᴇ region=VALUE ᴀɴᴅ plan=VALUE ᴏɴ sᴇᴘᴀʀᴀᴛᴇ ʟɪɴᴇs."); return
+            if "=" not in line: await _send(update,context,"ᴜsᴇ plan=VALUE ᴛᴏ ᴄʜᴀɴɢᴇ ᴛʜᴇ ᴡᴏʀᴋᴇʀ ᴘʟᴀɴ."); return
             key,val=line.split("=",1); items[key.strip()]=val.strip()
-        if set(items)-{"region","plan"}: await _send(update,context,"ᴏɴʟʏ region ᴀɴᴅ plan ᴀʀᴇ ᴀʟʟᴏᴡᴇᴅ."); return
-        region=items.get("region",row["render_region"] or "singapore").lower()
-        if region not in {"singapore","oregon","ohio","frankfurt","virginia"}: await _send(update,context,"ɪɴᴠᴀʟɪᴅ Rᴇɴᴅᴇʀ ʀᴇɢɪᴏɴ."); return
+        if set(items)-{"plan"}: await _send(update,context,"ᴏɴʟʏ plan ɪs ᴇᴅɪᴛᴀʙʟᴇ ʜᴇʀᴇ; ᴡᴏʀᴋᴇʀ ʀᴇɢɪᴏɴ ɪs sᴇᴛ ɢʟᴏʙᴀʟʟʏ ɪɴ RENDER_REGION."); return
         plan=items.get("plan",row["render_plan"] or "starter").lower()
-        if not re.fullmatch(r"[a-z0-9-]{3,32}",plan): await _send(update,context,"ɪɴᴠᴀʟɪᴅ Rᴇɴᴅᴇʀ ᴘʟᴀɴ."); return
-        await db.require().execute("UPDATE clone_instances SET render_region=$1,render_plan=$2,updated_at=NOW() WHERE clone_id=$3",region,plan,clone_id)
+        valid_plans={"starter","standard","pro","pro_plus","pro_max","pro_ultra","0.5c-512mb","1c-2g","2c-4g","2c-8g","2c-16g","4c-8g","4c-16g","4c-32g","8c-16g","8c-32g","8c-64g","12c-24g","12c-48g","12c-96g"}
+        if plan not in valid_plans: await _send(update,context,"ɪɴᴠᴀʟɪᴅ Rᴇɴᴅᴇʀ ᴘʟᴀɴ."); return
+        await db.require().execute("UPDATE clone_instances SET render_plan=$1,updated_at=NOW() WHERE clone_id=$2",plan,clone_id)
     elif field=="environment":
         try: env=_parse_environment(value)
         except ValueError as exc: await _send(update,context,str(exc)); return
+        previous=(
+            json.loads(Fernet(context.application.bot_data["encryption_key"]).decrypt(row["encrypted_environment"].encode()).decode())
+            if row["encrypted_environment"] else {}
+        )
+        if row["product"]=="link" and previous.get("SHORTENER_ENCRYPTION_KEY"):
+            env["SHORTENER_ENCRYPTION_KEY"]=previous["SHORTENER_ENCRYPTION_KEY"]
         secret=Fernet(context.application.bot_data["encryption_key"]).encrypt(json.dumps(env,ensure_ascii=False).encode()).decode()
         await db.require().execute("UPDATE clone_instances SET encrypted_environment=$1,updated_at=NOW() WHERE clone_id=$2",secret,clone_id)
     context.user_data.pop("pending_clone_edit",None)
