@@ -38,7 +38,7 @@ Private Telegram control bot for provisioning and managing the separate File Sha
 | `/clones` | Clone dashboard with live Render service status |
 | `/stopclone` | Select and stop a clone |
 | `/restartclone` | Select and restart a clone |
-| `/clonedit` | Edit clone name, token, repository/image, Render region and worker plan settings, encrypted environment and messages; redeploy changes |
+| `/clonedit` | Edit clone name, token, repository/image, worker plan settings, encrypted environment and messages; redeploy changes |
 | `/cloneinfo` | View clone details |
 | `/texts` | Browse editable manager and clone messages |
 | `/edittext` | Edit a selected message |
@@ -73,10 +73,10 @@ python -m clone_manager.main
 ## Current implementation boundaries
 - Text and media broadcasts support preview, immediate delivery, URL buttons, scheduled delivery in Asia/Kolkata time, queue inspection/cancellation and delivery reports. Scheduled payloads persist in PostgreSQL.
 - `/clonedit` is the clone configuration editor. Render is the configured deployment backend. Clone Manager creates image-backed Render Background Workers from the two prebuilt private GHCR packages; GitHub repositories remain separate source projects.
-- `/diagnostics` checks Telegram API access, PostgreSQL, Docker daemon availability, product image configuration and the clone secret directory.
+- `/diagnostics` checks Telegram API access, PostgreSQL, Render API access, the saved GHCR registry credential and both product repository/image mappings.
 - The HTTP health endpoint is `/health` when a `PORT` environment variable is supplied.
 - Clone provisioning requires a Render API key, workspace ID, a saved Render GHCR registry credential, and published File/Link images.
-- The manager must run on the same host as its Docker daemon and secret-file mount path. A normal Render web service does not expose a Docker socket, so clone creation cannot work there without a separate supported Docker host and a shared host path for secret mounts.
+- Clone Manager itself runs as a Render Web Service and creates the generated Telegram bots as independent Render Background Workers.
 
 Keep the manager private, restrict administrators, and never log plaintext BotFather tokens or Render API credentials.
 
