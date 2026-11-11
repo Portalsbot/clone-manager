@@ -22,6 +22,29 @@ def test_file_and_link_products_keep_their_repository_and_image_mapping(monkeypa
     assert provisioner.image_for("link") == "ghcr.io/portalsbot/link-sharing-bot:latest"
 
 
+def test_normalize_image_reference_accepts_https_registry_url_and_lowercases_repository(monkeypatch):
+    provisioner = make_provisioner(monkeypatch)
+
+    assert provisioner.normalize_image_reference(
+        "file", "https://ghcr.io/Portalsbot/File-Share-Bot:latest"
+    ) == "ghcr.io/portalsbot/file-share-bot:latest"
+
+
+def test_normalize_image_reference_maps_known_github_repository_to_product_image(monkeypatch):
+    provisioner = make_provisioner(monkeypatch)
+
+    assert provisioner.normalize_image_reference(
+        "file", "https://github.com/Portalsbot/File-Share-Bot"
+    ) == "ghcr.io/portalsbot/file-share-bot:latest"
+
+
+def test_normalize_image_reference_rejects_non_container_image_urls(monkeypatch):
+    provisioner = make_provisioner(monkeypatch)
+
+    with pytest.raises(ValueError, match="Invalid image reference"):
+        provisioner.normalize_image_reference("file", "https://i.ibb.co/example.png")
+
+
 def test_create_image_payload_uses_render_image_url_and_workspace(monkeypatch):
     provisioner = make_provisioner(monkeypatch)
 
