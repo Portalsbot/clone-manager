@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from ..branding import send_branded, keyboard_from_buttons
 
 SETTING_KEYS = {"manager.start":"message.start","manager.about":"message.about","manager.help":"message.help"}
