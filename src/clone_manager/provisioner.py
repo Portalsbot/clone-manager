@@ -125,9 +125,9 @@ class RenderProvisioner:
         return name[:60].rstrip("-")
 
     def _image_configuration(self, image_ref: str, *, include_owner: bool) -> dict[str, str]:
-        """Build the service image object using Render's service API schema."""
+        """Build the image-backed service object using Render's service API schema."""
         image = {
-            "imagePath": image_ref,
+            "imageUrl": image_ref,
             "registryCredentialId": self.registry_credential_id,
         }
         if include_owner:
