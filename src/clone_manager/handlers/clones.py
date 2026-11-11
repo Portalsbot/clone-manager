@@ -423,11 +423,10 @@ async def _redeploy_clone(update,context,row,token_override=None):
     env=json.loads(cipher.decrypt(row["encrypted_environment"].encode()).decode()) if row["encrypted_environment"] else {}
     new_id=await context.application.bot_data["provisioner"].redeploy(
         row["product"],row["clone_id"],token,context.application.bot_data["owner_id"],
-        current_render_service_id=row["render_service_id"],image_ref=row["image_ref"] or None,
-        network=row["docker_network"],restart_policy=row["restart_policy"] or "unless-stopped",
-        extra_environment=env)
+        current_service_id=row["render_service_id"],image_ref=row["image_ref"] or None,
+        extra_environment=env,region=row["render_region"],plan=row["render_plan"])
     encrypted=cipher.encrypt(token.encode()).decode()
-    await db.require().execute("UPDATE clone_instances SET render_service_id=$1,encrypted_token=$2,status='running',error_code=NULL,updated_at=NOW() WHERE clone_id=$3",new_id,encrypted,row["clone_id"])
+    await db.require().execute("UPDATE clone_instances SET render_service_id=$1,encrypted_token=$2,status='provisioning',error_code=NULL,updated_at=NOW() WHERE clone_id=$3",new_id,encrypted,row["clone_id"])
     await _send(update,context,f"ᴄʟᴏɴᴇ @{row['bot_username']} ʜᴀs ʙᴇᴇɴ ʀᴇᴅᴇᴘʟᴏʏᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.")
 
 
