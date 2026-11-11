@@ -42,7 +42,7 @@ def test_normalize_image_reference_rejects_non_container_image_urls(monkeypatch)
     provisioner = make_provisioner(monkeypatch)
 
     with pytest.raises(ValueError, match="Invalid image reference"):
-        provisioner.normalize_image_reference("file", "https://i.ibb.co/example.png")
+        provisioner.normalize_image_reference("file", "ghcr.io/portalsbot/invalid image:latest")
 
 
 def test_create_image_payload_uses_render_image_url_and_workspace(monkeypatch):
