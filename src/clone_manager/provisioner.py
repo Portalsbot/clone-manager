@@ -29,6 +29,7 @@ class RenderProvisioner:
     RESERVED_ENV = {
         "BOT_TOKEN", "DATABASE_URL", "OWNER_ID", "ADMINS", "CLONE_ID",
         "CONFIG_FILE", "BRANDING_IMAGE_URL", "BRANDING_IMAGE_PATH",
+        "SHORTENER_ENCRYPTION_KEY",
     }
 
     def __init__(self):
@@ -141,13 +142,18 @@ class RenderProvisioner:
             values["CHANNEL_URL"] = self.channel_url
         if self.storage_channel_id:
             values["STORAGE_CHANNEL_ID"] = self.storage_channel_id
+        custom_environment = dict(extra_environment or {})
         if product == "link":
             from cryptography.fernet import Fernet
-            values["SHORTENER_ENCRYPTION_KEY"] = Fernet.generate_key().decode("ascii")
+            # The key is generated once per clone and persisted encrypted by Clone Manager.
+            # On redeploy the stored value is supplied back through extra_environment.
+            values["SHORTENER_ENCRYPTION_KEY"] = custom_environment.pop(
+                "SHORTENER_ENCRYPTION_KEY", Fernet.generate_key().decode("ascii")
+            )
             if self.shortener_allowed_hosts:
                 values["SHORTENER_ALLOWED_HOSTS"] = self.shortener_allowed_hosts
 
-        for key, value in (extra_environment or {}).items():
+        for key, value in custom_environment.items():
             if not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key):
                 raise ValueError(f"Invalid environment variable name: {key!r}")
             if key in self.RESERVED_ENV:
@@ -173,12 +179,18 @@ class RenderProvisioner:
         name = self._service_name(product, clone_id)
         existing_id = await self._find_service(name)
         if existing_id:
+            service_path = f"/services/{quote(existing_id, safe='')}"
+            await self._request("PUT", f"{service_path}/env-vars", payload=environment)
+            await self._request("PATCH", service_path, payload={
+                "image": {
+                    "ownerId": self.workspace_id,
+                    "imagePath": image_ref,
+                    "registryCredentialId": self.registry_credential_id,
+                },
+                "serviceDetails": {"plan": (plan or self.plan).lower()},
+            })
             await self._request(
-                "PUT", f"/services/{quote(existing_id, safe='')}/env-vars",
-                payload=environment,
-            )
-            await self._request(
-                "POST", f"/services/{quote(existing_id, safe='')}/deploys",
+                "POST", f"{service_path}/deploys",
                 payload={"clearCache": "do_not_clear"},
             )
             return existing_id
@@ -233,10 +245,7 @@ class RenderProvisioner:
                     "imagePath": image,
                     "registryCredentialId": self.registry_credential_id,
                 },
-                "serviceDetails": {
-                    "region": (region or self.region).lower(),
-                    "plan": (plan or self.plan).lower(),
-                },
+                "serviceDetails": {"plan": (plan or self.plan).lower()},
             })
             await self._request("POST", f"{service_path}/deploys", payload={"clearCache": "do_not_clear"})
             return current_service_id
@@ -270,8 +279,8 @@ class RenderProvisioner:
                 "GET", f"/services/{quote(service_id, safe='')}/deploys",
                 params={"limit": 1},
             )
-        except RenderAPIError as exc:
-            return "unknown" if exc.status_code == 404 else "unknown"
+        except RenderAPIError:
+            return "unknown"
         if isinstance(deploys, list) and deploys:
             latest = deploys[0].get("deploy", deploys[0]) if isinstance(deploys[0], dict) else {}
             state = str(latest.get("status", "")).lower() if isinstance(latest, dict) else ""
