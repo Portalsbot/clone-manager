@@ -169,7 +169,7 @@ def main():
     app.bot_data.update({"settings":settings,"owner_id":owner_id,"admins":admin_ids,"clone_id":settings.clone_id,
         "image_url":settings.branding_image_url,"image_path":settings.branding_image_path,
         "small_caps":settings.small_caps,"defaults":DEFAULT_MESSAGES,"allowed_users":allowed,
-        "encryption_key":encryption_key,"provisioner":RenderProvisioner()}})
+        "encryption_key":encryption_key,"provisioner":RenderProvisioner()})
     app.add_handler(MessageHandler(filters.ALL, message_fsubs_gate), group=-110)
     app.add_handler(CallbackQueryHandler(callback_fsubs_gate), group=-11)
     app.add_handler(CallbackQueryHandler(close_branded_message,pattern=r"^branding:close$"),group=-10)
