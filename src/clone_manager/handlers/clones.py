@@ -111,7 +111,11 @@ async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
     owner_id=context.application.bot_data["owner_id"]
     provisioner=context.application.bot_data["provisioner"]
     repo_url=provisioner.repository_for(product)
-    image_ref=provisioner.image_for(product)
+    try:
+        image_ref=provisioner.normalize_image_reference(product,provisioner.image_for(product))
+    except ValueError as exc:
+        await _send(update,context,str(exc))
+        return
     managed_environment={}
     if product=="link":
         managed_environment["SHORTENER_ENCRYPTION_KEY"]=Fernet.generate_key().decode("ascii")
@@ -393,9 +397,10 @@ def _parse_repository(value:str,product:str)->tuple[str|None,str]:
             raise ValueError("ᴛʜɪs ʀᴇᴘᴏsɪᴛᴏʀʏ ʙᴇʟᴏɴɢs ᴛᴏ ᴛʜᴇ ᴏᴛʜᴇʀ ʙᴏᴛ ᴘʀᴏᴅᴜᴄᴛ.")
         image=mapped[1] if mapped else f"ghcr.io/{owner.lower()}/{repo.lower()}:latest"
         return canonical,image
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{1,254}",value) or "://" in value:
-        raise ValueError("sᴇɴᴅ ᴀ GɪᴛHᴜʙ ʀᴇᴘᴏ URL ᴏʀ GHCR ɪᴍᴀɢᴇ ʀᴇғᴇʀᴇɴᴄᴇ.")
-    return None,value
+    try:
+        return None,RenderProvisioner.normalize_image_reference(product,value)
+    except ValueError as exc:
+        raise ValueError("sᴇɴᴅ ᴀ GɪᴛHᴜʙ ʀᴇᴘᴏ URL ᴏʀ ᴀ ᴠᴀʟɪᴅ GHCR ɪᴍᴀɢᴇ ʀᴇғᴇʀᴇɴᴄᴇ.") from exc
 
 
 async def _start_clone_edit(update,context,clone_id,field):
@@ -429,14 +434,16 @@ async def _start_clone_edit(update,context,clone_id,field):
 
 async def _redeploy_clone(update,context,row,token_override=None):
     db=context.application.bot_data["db"]; cipher=Fernet(context.application.bot_data["encryption_key"])
+    provisioner=context.application.bot_data["provisioner"]
     token=token_override or cipher.decrypt(row["encrypted_token"].encode()).decode()
     env=json.loads(cipher.decrypt(row["encrypted_environment"].encode()).decode()) if row["encrypted_environment"] else {}
-    new_id=await context.application.bot_data["provisioner"].redeploy(
+    image_ref=provisioner.normalize_image_reference(row["product"],row["image_ref"] or None)
+    new_id=await provisioner.redeploy(
         row["product"],row["clone_id"],token,context.application.bot_data["owner_id"],
-        current_service_id=row["render_service_id"],image_ref=row["image_ref"] or None,
+        current_service_id=row["render_service_id"],image_ref=image_ref,
         extra_environment=env,region=row["render_region"],plan=row["render_plan"])
     encrypted=cipher.encrypt(token.encode()).decode()
-    await db.require().execute("UPDATE clone_instances SET render_service_id=$1,encrypted_token=$2,status='provisioning',error_code=NULL,updated_at=NOW() WHERE clone_id=$3",new_id,encrypted,row["clone_id"])
+    await db.require().execute("UPDATE clone_instances SET render_service_id=$1,encrypted_token=$2,image_ref=$3,status='provisioning',error_code=NULL,updated_at=NOW() WHERE clone_id=$4",new_id,encrypted,image_ref,row["clone_id"])
     await _send(update,context,f"ᴄʟᴏɴᴇ @{row['bot_username']} ʜᴀs ʙᴇᴇɴ ʀᴇᴅᴇᴘʟᴏʏᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.")
 
 
