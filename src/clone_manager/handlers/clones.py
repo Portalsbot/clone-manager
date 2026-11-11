@@ -127,7 +127,10 @@ async def receive_token(update:Update,context:ContextTypes.DEFAULT_TYPE):
         clone_id,owner_id,product,me.id,me.username or str(me.id),me.first_name,
         repo_url,image_ref,encrypted,encrypted_environment)
     try:
-        render_service_id=await provisioner.create(product,clone_id,token,owner_id,image_ref=image_ref)
+        render_service_id=await provisioner.create(
+            product,clone_id,token,owner_id,image_ref=image_ref,
+            extra_environment=managed_environment,
+        )
         await db.require().execute("UPDATE clone_instances SET render_service_id=$1,status='provisioning',updated_at=NOW() WHERE clone_id=$2",render_service_id,clone_id)
         success_template=await db.get_text(context.application.bot_data["clone_id"],"cloner.success",context.application.bot_data["defaults"]["cloner.success"])
         await _send(update,context,success_template.format(username=me.username or me.id,product=product.title(),clone_id=clone_id))
