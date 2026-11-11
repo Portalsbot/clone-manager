@@ -29,7 +29,7 @@ def test_create_image_payload_uses_render_image_url_and_workspace(monkeypatch):
         "ghcr.io/portalsbot/file-share-bot:latest", include_owner=True
     ) == {
         "ownerId": "tea-test-workspace",
-        "imageUrl": "ghcr.io/portalsbot/file-share-bot:latest",
+        "imagePath": "ghcr.io/portalsbot/file-share-bot:latest",
         "registryCredentialId": "rc_test_registry",
     }
 
@@ -40,7 +40,7 @@ def test_update_image_payload_uses_render_image_url_without_owner(monkeypatch):
     assert provisioner._image_configuration(
         "ghcr.io/portalsbot/link-sharing-bot:latest", include_owner=False
     ) == {
-        "imageUrl": "ghcr.io/portalsbot/link-sharing-bot:latest",
+        "imagePath": "ghcr.io/portalsbot/link-sharing-bot:latest",
         "registryCredentialId": "rc_test_registry",
     }
 
@@ -74,7 +74,7 @@ async def test_create_file_worker_sends_render_background_worker_payload(monkeyp
     assert captured["payload"]["ownerId"] == "tea-test-workspace"
     assert captured["payload"]["image"] == {
         "ownerId": "tea-test-workspace",
-        "imageUrl": "ghcr.io/portalsbot/file-share-bot:latest",
+        "imagePath": "ghcr.io/portalsbot/file-share-bot:latest",
         "registryCredentialId": "rc_test_registry",
     }
     assert captured["payload"]["serviceDetails"]["region"] == "singapore"
@@ -106,10 +106,10 @@ async def test_existing_worker_update_uses_image_url_and_redeploys(monkeypatch):
     assert service_id == "srv_link_existing"
     patch = next(item for item in requests if item[0] == "PATCH")
     assert patch[2]["image"] == {
-        "imageUrl": "ghcr.io/portalsbot/link-sharing-bot:latest",
+        "imagePath": "ghcr.io/portalsbot/link-sharing-bot:latest",
         "registryCredentialId": "rc_test_registry",
     }
-    assert not any("imagePath" in str(item[2]) for item in requests)
+    assert not any("imageUrl" in str(item[2]) for item in requests)
     assert ("POST", "/services/srv_link_existing/deploys") in [
         (method, path) for method, path, _ in requests
     ]
