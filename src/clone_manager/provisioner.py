@@ -124,6 +124,16 @@ class RenderProvisioner:
         name = f"clone-{product}-{self._slug(clone_id)}"
         return name[:60].rstrip("-")
 
+    def _image_configuration(self, image_ref: str, *, include_owner: bool) -> dict[str, str]:
+        """Build the image object using Render's current API schema."""
+        image = {
+            "imageUrl": image_ref,
+            "registryCredentialId": self.registry_credential_id,
+        }
+        if include_owner:
+            image["ownerId"] = self.workspace_id
+        return image
+
     def _worker_environment(self, product: str, clone_id: str, token: str, owner_id: int,
                             extra_environment: dict[str, str] | None = None) -> list[dict[str, str]]:
         values = {
@@ -182,11 +192,7 @@ class RenderProvisioner:
             service_path = f"/services/{quote(existing_id, safe='')}"
             await self._request("PUT", f"{service_path}/env-vars", payload=environment)
             await self._request("PATCH", service_path, payload={
-                "image": {
-                    "ownerId": self.workspace_id,
-                    "imagePath": image_ref,
-                    "registryCredentialId": self.registry_credential_id,
-                },
+                "image": self._image_configuration(image_ref, include_owner=False),
                 "serviceDetails": {"plan": (plan or self.plan).lower()},
             })
             await self._request(
@@ -200,11 +206,7 @@ class RenderProvisioner:
             "name": name,
             "ownerId": self.workspace_id,
             "autoDeployTrigger": "off",
-            "image": {
-                "ownerId": self.workspace_id,
-                "imagePath": image_ref,
-                "registryCredentialId": self.registry_credential_id,
-            },
+            "image": self._image_configuration(image_ref, include_owner=True),
             "envVars": environment,
             "serviceDetails": {
                 "region": (region or self.region).lower(),
@@ -240,11 +242,7 @@ class RenderProvisioner:
         try:
             await self._request("PUT", f"{service_path}/env-vars", payload=env)
             await self._request("PATCH", service_path, payload={
-                "image": {
-                    "ownerId": self.workspace_id,
-                    "imagePath": image,
-                    "registryCredentialId": self.registry_credential_id,
-                },
+                "image": self._image_configuration(image, include_owner=False),
                 "serviceDetails": {"plan": (plan or self.plan).lower()},
             })
             await self._request("POST", f"{service_path}/deploys", payload={"clearCache": "do_not_clear"})
