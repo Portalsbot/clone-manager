@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -66,6 +66,95 @@ class RenderProvisioner:
         if product not in self.DEFAULT_IMAGES:
             raise ValueError(f"Unsupported clone product: {product}")
         return self.file_image if product == "file" else self.link_image
+
+    @classmethod
+    def normalize_image_reference(cls, product: str, image_ref: str | None) -> str:
+        """Return a normalized Docker/OCI image reference accepted by Render."""
+        if product not in cls.DEFAULT_IMAGES:
+            raise ValueError(f"Unsupported clone product: {product}")
+
+        original = str(image_ref or "").strip() or cls.DEFAULT_IMAGES[product]
+        value = original
+
+        # Render expects a registry reference, not an HTTP URL. Accept common
+        # copied URL forms and convert them into the equivalent image reference.
+        if value.startswith("docker://"):
+            value = value[len("docker://"):]
+        elif value.startswith(("https://", "http://")):
+            parsed = urlsplit(value)
+            if (
+                parsed.scheme != "https"
+                or not parsed.netloc
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+            ):
+                raise ValueError(
+                    f"Invalid image reference for {product}: {original!r}. "
+                    f"Use a registry/namespace/image:tag reference such as {cls.DEFAULT_IMAGES[product]}."
+                )
+
+            host = (parsed.hostname or "").lower()
+            if host in {"github.com", "www.github.com"}:
+                parts = [part for part in parsed.path.strip("/").split("/") if part]
+                if len(parts) < 2:
+                    raise ValueError(
+                        f"Invalid GitHub repository URL for {product}: {original!r}."
+                    )
+                owner, repository = parts[0], parts[1].removesuffix(".git")
+                expected = urlsplit(cls.PRODUCT_REPOSITORIES[product]).path.strip("/").lower()
+                if f"{owner}/{repository}".lower() == expected:
+                    return cls.DEFAULT_IMAGES[product]
+                value = f"ghcr.io/{owner.lower()}/{repository.lower()}:latest"
+            else:
+                value = f"{parsed.netloc.lower()}{parsed.path}"
+        elif "://" in value:
+            raise ValueError(
+                f"Invalid image reference for {product}: {original!r}. "
+                f"Use a registry/namespace/image:tag reference such as {cls.DEFAULT_IMAGES[product]}."
+            )
+
+        def invalid() -> ValueError:
+            return ValueError(
+                f"Invalid image reference for {product}: {original!r}. "
+                f"Use a registry/namespace/image:tag reference such as {cls.DEFAULT_IMAGES[product]}."
+            )
+
+        if not value or any(character.isspace() for character in value) or value.startswith("/") or value.endswith("/"):
+            raise invalid()
+
+        digest_suffix = ""
+        if "@" in value:
+            if value.count("@") != 1:
+                raise invalid()
+            value, digest = value.rsplit("@", 1)
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_+.-]*:[0-9a-fA-F]{32,}", digest):
+                raise invalid()
+            digest_suffix = "@" + digest.lower()
+
+        tag_suffix = ""
+        final_component = value.rsplit("/", 1)[-1]
+        if ":" in final_component:
+            value, tag = value.rsplit(":", 1)
+            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", tag):
+                raise invalid()
+            tag_suffix = ":" + tag
+        elif not digest_suffix:
+            tag_suffix = ":latest"
+
+        components = value.split("/")
+        domain_pattern = r"[a-z0-9]+(?:[.-][a-z0-9]+)*(?::[0-9]{1,5})?"
+        path_pattern = r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*"
+        if (
+            len(components) < 2
+            or not re.fullmatch(domain_pattern, components[0].lower())
+            or any(not re.fullmatch(path_pattern, component.lower()) for component in components[1:])
+        ):
+            raise invalid()
+
+        normalized_name = "/".join(component.lower() for component in components)
+        return normalized_name + tag_suffix + digest_suffix
 
     def validate_configuration(self) -> None:
         missing = [
@@ -186,6 +275,7 @@ class RenderProvisioner:
 
     async def _create_service(self, product: str, clone_id: str, image_ref: str,
                               environment: list[dict[str, str]], *, region=None, plan=None) -> str:
+        image_ref = self.normalize_image_reference(product, image_ref)
         name = self._service_name(product, clone_id)
         existing_id = await self._find_service(name)
         if existing_id:
@@ -225,7 +315,7 @@ class RenderProvisioner:
                      *, image_ref=None, extra_environment=None, region=None, plan=None):
         if product not in self.DEFAULT_IMAGES:
             raise ValueError(f"Unsupported clone product: {product}")
-        image = (image_ref or self.image_for(product)).strip()
+        image = self.normalize_image_reference(product, image_ref or self.image_for(product))
         env = self._worker_environment(product, clone_id, bot_token, owner_id, extra_environment)
         return await self._create_service(product, clone_id, image, env, region=region, plan=plan)
 
@@ -237,7 +327,7 @@ class RenderProvisioner:
                 product, clone_id, bot_token, owner_id, image_ref=image_ref,
                 extra_environment=extra_environment, region=region, plan=plan,
             )
-        image = (image_ref or self.image_for(product)).strip()
+        image = self.normalize_image_reference(product, image_ref or self.image_for(product))
         env = self._worker_environment(product, clone_id, bot_token, owner_id, extra_environment)
         service_path = f"/services/{quote(current_service_id, safe='')}"
         try:
