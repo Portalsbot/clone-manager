@@ -349,7 +349,7 @@ async def _show_clone_edit_menu(update,context,row):
           f"ɪᴅ: {clone_id}\nɴᴀᴍᴇ: {row['bot_name'] or 'not customised'}\n"
           f"ʀᴇᴘᴏsɪᴛᴏʀʏ: {row['repository_url'] or row['image_ref'] or 'product default'}\n"
           f"ʜᴏsᴛɪɴɢ: Render Background Worker\n"
-          f"ᴇɴᴠɪʀᴏɴᴍᴇɴᴛ ᴠᴀʀɪᴀʙʟᴇs: {'unreadable' if count<0 else count}\n"
+          f"ᴄᴜsᴛᴏᴍ ᴇɴᴠ ᴠᴀʀs: {'unreadable' if count<0 else count}\n"
           f"ʀᴇɢɪᴏɴ: {row['render_region'] or 'workspace default'}\n"
           f"ᴘʟᴀɴ: {row['render_plan'] or 'workspace default'}")
     markup=InlineKeyboardMarkup([
