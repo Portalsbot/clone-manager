@@ -57,10 +57,10 @@ def test_environment_parser_accepts_multiple_custom_values():
 
 
 def test_github_repository_maps_to_ghcr_image_reference():
-    url, image = _parse_repository("https://github.com/Portalsbot/File-Share-Bot")
+    url, image = _parse_repository("https://github.com/Portalsbot/File-Share-Bot", "file")
     assert url == "https://github.com/Portalsbot/File-Share-Bot"
     assert image == "ghcr.io/portalsbot/file-share-bot:latest"
 
 
 def test_docker_image_reference_is_accepted():
-    assert _parse_repository("ghcr.io/example/bot:v2") == (None, "ghcr.io/example/bot:v2")
+    assert _parse_repository("ghcr.io/example/bot:v2", "file") == (None, "ghcr.io/example/bot:v2")
