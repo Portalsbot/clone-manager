@@ -1,137 +1,292 @@
-"""Docker provisioning and container replacement for generated clones."""
+"""Render API provisioning for private File Sharing and Link Sharing bot images."""
 from __future__ import annotations
 
-import json
 import os
 import re
-import secrets
-from pathlib import Path
+from urllib.parse import quote
 
-import docker
+import httpx
 
 
-class DockerProvisioner:
+class RenderAPIError(RuntimeError):
+    def __init__(self, status_code: int, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class RenderProvisioner:
+    """Creates and manages image-backed Render Background Workers."""
+
+    API_BASE = "https://api.render.com/v1"
+    PRODUCT_REPOSITORIES = {
+        "file": "https://github.com/Portalsbot/File-Share-Bot",
+        "link": "https://github.com/Portalsbot/link-sharing-bot",
+    }
+    DEFAULT_IMAGES = {
+        "file": "ghcr.io/portalsbot/file-share-bot:latest",
+        "link": "ghcr.io/portalsbot/link-sharing-bot:latest",
+    }
+    RESERVED_ENV = {
+        "BOT_TOKEN", "DATABASE_URL", "OWNER_ID", "ADMINS", "CLONE_ID",
+        "CONFIG_FILE", "BRANDING_IMAGE_URL", "BRANDING_IMAGE_PATH",
+    }
+
     def __init__(self):
-        self.client=docker.from_env(timeout=15)
-        self.secret_root=Path(os.getenv("CLONE_SECRET_DIR","/var/lib/clone-manager/secrets"))
-        self.database_url=os.environ["DATABASE_URL"]
-        self.branding_url=os.getenv("BRANDING_IMAGE_URL","https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png")
-        self.file_image=os.getenv("FILE_SHARING_IMAGE","")
-        self.link_image=os.getenv("LINK_SHARING_IMAGE","")
-        self.network=os.getenv("CLONE_DOCKER_NETWORK") or None
-        self.registry_user=os.getenv("GHCR_USERNAME")
-        self.registry_token=os.getenv("GHCR_TOKEN")
+        self.api_key = os.getenv("RENDER_API_KEY", "").strip()
+        self.workspace_id = (
+            os.getenv("RENDER_WORKSPACE_ID") or os.getenv("RENDER_OWNER_ID") or ""
+        ).strip()
+        self.registry_credential_id = os.getenv("RENDER_REGISTRY_CREDENTIAL_ID", "").strip()
+        self.database_url = os.getenv("DATABASE_URL", "").strip()
+        self.owner_id = os.getenv("OWNER_ID", "").strip()
+        self.admin_ids = os.getenv("ADMIN_IDS", "").replace(",", " ").strip()
+        self.branding_url = os.getenv(
+            "BRANDING_IMAGE_URL",
+            "https://i.ibb.co/PGpMYwYY/Gemini-Generated-Image-a7tjlia7tjlia7tj.png",
+        ).strip()
+        self.file_image = os.getenv("FILE_SHARING_IMAGE", self.DEFAULT_IMAGES["file"]).strip()
+        self.link_image = os.getenv("LINK_SHARING_IMAGE", self.DEFAULT_IMAGES["link"]).strip()
+        self.file_repo = os.getenv("FILE_SHARING_REPO_URL", self.PRODUCT_REPOSITORIES["file"]).strip()
+        self.link_repo = os.getenv("LINK_SHARING_REPO_URL", self.PRODUCT_REPOSITORIES["link"]).strip()
+        self.region = os.getenv("RENDER_REGION", "singapore").strip().lower()
+        self.plan = os.getenv("RENDER_WORKER_PLAN", "starter").strip().lower()
+        self.channel_url = os.getenv("CLONE_CHANNEL_URL", "").strip()
+        self.storage_channel_id = os.getenv("CLONE_STORAGE_CHANNEL_ID", "").strip()
+        self.default_auto_delete = os.getenv("CLONE_DEFAULT_AUTO_DELETE", "0").strip()
+        self.max_files_per_user = os.getenv("CLONE_MAX_FILES_PER_USER", "50").strip()
+        self.shortener_allowed_hosts = os.getenv("LINK_SHORTENER_ALLOWED_HOSTS", "").strip()
 
-    def _safe(self,clone_id):
-        return re.sub(r"[^a-zA-Z0-9_.-]","-",clone_id)
+    def repository_for(self, product: str) -> str:
+        if product not in self.PRODUCT_REPOSITORIES:
+            raise ValueError(f"Unsupported clone product: {product}")
+        return self.file_repo if product == "file" else self.link_repo
 
-    def _image(self,product,image_ref):
-        image=image_ref or (self.file_image if product=="file" else self.link_image)
-        if not image: raise RuntimeError(f"Image not configured for product: {product}")
-        return image
+    def image_for(self, product: str) -> str:
+        if product not in self.DEFAULT_IMAGES:
+            raise ValueError(f"Unsupported clone product: {product}")
+        return self.file_image if product == "file" else self.link_image
 
-    def _pull(self,image):
-        if self.registry_user and self.registry_token:
-            self.client.login(username=self.registry_user,password=self.registry_token,registry="ghcr.io")
-        self.client.images.pull(image)
+    def validate_configuration(self) -> None:
+        missing = [
+            name for name, value in (
+                ("RENDER_API_KEY", self.api_key),
+                ("RENDER_WORKSPACE_ID", self.workspace_id),
+                ("RENDER_REGISTRY_CREDENTIAL_ID", self.registry_credential_id),
+                ("DATABASE_URL", self.database_url),
+                ("OWNER_ID", self.owner_id),
+            ) if not value
+        ]
+        if missing:
+            raise RuntimeError("Missing Render provisioning configuration: " + ", ".join(missing))
+        if not self.file_image or not self.link_image:
+            raise RuntimeError("Both FILE_SHARING_IMAGE and LINK_SHARING_IMAGE must be configured.")
+        if not self.file_repo.startswith("https://github.com/") or not self.link_repo.startswith("https://github.com/"):
+            raise RuntimeError("Both product repository URLs must be HTTPS GitHub repository URLs.")
 
-    def _config_file(self,clone_id,bot_token,owner_id,extra_environment):
-        self.secret_root.mkdir(parents=True,exist_ok=True,mode=0o700); os.chmod(self.secret_root,0o700)
-        folder=self.secret_root/self._safe(clone_id)
-        folder.mkdir(parents=True,exist_ok=True,mode=0o700); os.chmod(folder,0o700)
-        config={"BOT_TOKEN":bot_token,"DATABASE_URL":self.database_url,"CLONE_ID":clone_id,
-                "OWNER_ID":str(owner_id),"BRANDING_IMAGE_URL":self.branding_url,"SMALL_CAPS":"true"}
-        reserved = {"BOT_TOKEN", "DATABASE_URL", "CLONE_ID", "OWNER_ID", "BRANDING_IMAGE_URL", "SMALL_CAPS"}
+    async def _request(self, method: str, path: str, *, params=None, payload=None):
+        self.validate_configuration()
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        url = f"{self.API_BASE}{path}"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(35.0, connect=10.0)) as client:
+            response = await client.request(
+                method, url, headers=headers, params=params, json=payload
+            )
+        if response.status_code >= 400:
+            try:
+                body = response.json()
+                detail = body.get("message") or body.get("error") or body.get("code") or "Render API request failed"
+            except (ValueError, AttributeError):
+                detail = "Render API request failed"
+            # Never include request headers or secrets in an exception/log message.
+            raise RenderAPIError(response.status_code, f"Render API HTTP {response.status_code}: {str(detail)[:240]}")
+        if response.status_code == 204 or not response.content:
+            return None
+        return response.json()
+
+    @staticmethod
+    def _service_id(data) -> str | None:
+        if not isinstance(data, dict):
+            return None
+        service = data.get("service") if isinstance(data.get("service"), dict) else data
+        service_id = service.get("id") if isinstance(service, dict) else None
+        return str(service_id) if service_id else None
+
+    @staticmethod
+    def _slug(value: str) -> str:
+        return re.sub(r"[^a-z0-9-]+", "-", value.lower()).strip("-") or "bot"
+
+    def _service_name(self, product: str, clone_id: str) -> str:
+        name = f"clone-{product}-{self._slug(clone_id)}"
+        return name[:60].rstrip("-")
+
+    def _worker_environment(self, product: str, clone_id: str, token: str, owner_id: int,
+                            extra_environment: dict[str, str] | None = None) -> list[dict[str, str]]:
+        values = {
+            "BOT_TOKEN": token,
+            "DATABASE_URL": self.database_url,
+            "OWNER_ID": str(owner_id),
+            "ADMINS": self.admin_ids,
+            "CLONE_ID": clone_id,
+            "BRANDING_IMAGE_URL": self.branding_url,
+            "BRANDING_IMAGE_PATH": "",
+            "SMALL_CAPS": "true",
+            "DEFAULT_AUTO_DELETE": self.default_auto_delete,
+            "MAX_FILES_PER_USER": self.max_files_per_user,
+        }
+        if self.channel_url:
+            values["CHANNEL_URL"] = self.channel_url
+        if self.storage_channel_id:
+            values["STORAGE_CHANNEL_ID"] = self.storage_channel_id
+        if product == "link":
+            from cryptography.fernet import Fernet
+            values["SHORTENER_ENCRYPTION_KEY"] = Fernet.generate_key().decode("ascii")
+            if self.shortener_allowed_hosts:
+                values["SHORTENER_ALLOWED_HOSTS"] = self.shortener_allowed_hosts
+
         for key, value in (extra_environment or {}).items():
-            if not isinstance(key, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key):
+            if not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key):
                 raise ValueError(f"Invalid environment variable name: {key!r}")
-            if key in reserved:
+            if key in self.RESERVED_ENV:
                 raise ValueError(f"{key} is managed by Clone Manager and cannot be overridden.")
-            config[key] = str(value)
-        path=folder/f"config-{secrets.token_hex(8)}.json"
-        path.write_text(json.dumps(config,ensure_ascii=False),encoding="utf-8"); os.chmod(path,0o600)
-        return path
+            values[key] = str(value)
+        return [{"key": key, "value": str(value)} for key, value in values.items()]
 
-    def _run(self,image,product,clone_id,path,network,restart_policy):
-        return self.client.containers.run(
-            image,detach=True,name=f"tg-{self._safe(clone_id)}",
-            environment={"CONFIG_FILE":"/run/secrets/app-config.json"},
-            volumes={str(path):{"bind":"/run/secrets/app-config.json","mode":"ro"}},
-            network=network if network is not None else self.network,
-            restart_policy={"Name":restart_policy},
-            labels={"app":"telegram-clone","clone_id":clone_id,"product":product},
+    async def _find_service(self, name: str) -> str | None:
+        data = await self._request(
+            "GET", "/services",
+            params={"ownerId": self.workspace_id, "name": name, "limit": 100},
         )
+        if not isinstance(data, list):
+            return None
+        for item in data:
+            service = item.get("service", item) if isinstance(item, dict) else {}
+            if isinstance(service, dict) and service.get("name") == name and service.get("id"):
+                return str(service["id"])
+        return None
 
-    def _create_sync(self,product,clone_id,token,owner_id,image_ref,network,restart_policy,extra_environment):
-        image=self._image(product,image_ref); self._pull(image)
-        path=self._config_file(clone_id,token,owner_id,extra_environment)
-        try: return self._run(image,product,clone_id,path,network,restart_policy).id
-        except Exception: path.unlink(missing_ok=True); raise
+    async def _create_service(self, product: str, clone_id: str, image_ref: str,
+                              environment: list[dict[str, str]], *, region=None, plan=None) -> str:
+        name = self._service_name(product, clone_id)
+        existing_id = await self._find_service(name)
+        if existing_id:
+            await self._request(
+                "PUT", f"/services/{quote(existing_id, safe='')}/env-vars",
+                payload=environment,
+            )
+            await self._request(
+                "POST", f"/services/{quote(existing_id, safe='')}/deploys",
+                payload={"clearCache": "do_not_clear"},
+            )
+            return existing_id
 
-    async def create(self,product,clone_id,bot_token,owner_id,*,image_ref=None,network=None,
-                     restart_policy="unless-stopped",extra_environment=None):
-        import asyncio
-        return await asyncio.to_thread(self._create_sync,product,clone_id,bot_token,owner_id,
-                                       image_ref,network,restart_policy,extra_environment or {})
+        payload = {
+            "type": "background_worker",
+            "name": name,
+            "ownerId": self.workspace_id,
+            "autoDeployTrigger": "off",
+            "image": {
+                "ownerId": self.workspace_id,
+                "imagePath": image_ref,
+                "registryCredentialId": self.registry_credential_id,
+            },
+            "envVars": environment,
+            "serviceDetails": {
+                "region": (region or self.region).lower(),
+                "plan": (plan or self.plan).lower(),
+                "numInstances": 1,
+            },
+        }
+        data = await self._request("POST", "/services", payload=payload)
+        service_id = self._service_id(data)
+        if not service_id:
+            raise RuntimeError("Render accepted the service request but did not return a service ID.")
+        return service_id
 
-    def _redeploy_sync(self,product,clone_id,token,owner_id,current_id,image_ref,network,restart_policy,extra_environment):
-        image=self._image(product,image_ref); self._pull(image)
-        path=self._config_file(clone_id,token,owner_id,extra_environment)
-        name=f"tg-{self._safe(clone_id)}"
-        old=None
-        if current_id:
-            try:
-                old=self.client.containers.get(current_id)
-            except docker.errors.NotFound:
-                old=None
-        backup=f"{name}-backup-{secrets.token_hex(3)}"
-        new=None
+    async def create(self, product: str, clone_id: str, bot_token: str, owner_id: int,
+                     *, image_ref=None, extra_environment=None, region=None, plan=None):
+        if product not in self.DEFAULT_IMAGES:
+            raise ValueError(f"Unsupported clone product: {product}")
+        image = (image_ref or self.image_for(product)).strip()
+        env = self._worker_environment(product, clone_id, bot_token, owner_id, extra_environment)
+        return await self._create_service(product, clone_id, image, env, region=region, plan=plan)
+
+    async def redeploy(self, product: str, clone_id: str, bot_token: str, owner_id: int,
+                       *, current_service_id: str | None, image_ref=None, extra_environment=None,
+                       region=None, plan=None):
+        if not current_service_id:
+            return await self.create(
+                product, clone_id, bot_token, owner_id, image_ref=image_ref,
+                extra_environment=extra_environment, region=region, plan=plan,
+            )
+        image = (image_ref or self.image_for(product)).strip()
+        env = self._worker_environment(product, clone_id, bot_token, owner_id, extra_environment)
+        service_path = f"/services/{quote(current_service_id, safe='')}"
         try:
-            if old:
-                old.stop(timeout=20)
-                old.rename(backup)
-            new=self._run(image,product,clone_id,path,network,restart_policy)
-            new_id=new.id
-            if old: old.remove(force=True)
-            for stale in path.parent.glob("config-*.json"):
-                if stale!=path: stale.unlink(missing_ok=True)
-            return new_id
-        except Exception:
-            if new is not None:
-                try: new.remove(force=True)
-                except Exception: pass
-            if old:
-                try:
-                    old.reload()
-                    if old.name != name:
-                        old.rename(name)
-                    if old.status != "running":
-                        old.start()
-                except Exception:
-                    pass
-            path.unlink(missing_ok=True)
-            raise
+            await self._request("PUT", f"{service_path}/env-vars", payload=env)
+            await self._request("PATCH", service_path, payload={
+                "image": {
+                    "ownerId": self.workspace_id,
+                    "imagePath": image,
+                    "registryCredentialId": self.registry_credential_id,
+                },
+                "serviceDetails": {
+                    "region": (region or self.region).lower(),
+                    "plan": (plan or self.plan).lower(),
+                },
+            })
+            await self._request("POST", f"{service_path}/deploys", payload={"clearCache": "do_not_clear"})
+            return current_service_id
+        except RenderAPIError as exc:
+            if exc.status_code != 404:
+                raise
+            # The service may have been removed manually from Render. Recreate it.
+            return await self.create(
+                product, clone_id, bot_token, owner_id, image_ref=image,
+                extra_environment=extra_environment, region=region, plan=plan,
+            )
 
-    async def redeploy(self,product,clone_id,bot_token,owner_id,*,current_container_id,
-                       image_ref=None,network=None,restart_policy="unless-stopped",extra_environment=None):
-        import asyncio
-        return await asyncio.to_thread(self._redeploy_sync,product,clone_id,bot_token,owner_id,
-                                       current_container_id,image_ref,network,restart_policy,extra_environment or {})
+    async def stop(self, service_id: str):
+        return await self._request("POST", f"/services/{quote(service_id, safe='')}/suspend", payload={})
 
-    async def stop(self,container_id):
-        import asyncio
-        await asyncio.to_thread(lambda:self.client.containers.get(container_id).stop(timeout=15))
+    async def restart(self, service_id: str):
+        path = f"/services/{quote(service_id, safe='')}"
+        service = await self._request("GET", path)
+        action = "resume" if isinstance(service, dict) and service.get("suspended") == "suspended" else "restart"
+        return await self._request("POST", f"{path}/{action}", payload={})
 
-    async def restart(self,container_id):
-        import asyncio
-        await asyncio.to_thread(lambda:self.client.containers.get(container_id).restart(timeout=15))
+    async def delete(self, service_id: str):
+        return await self._request("DELETE", f"/services/{quote(service_id, safe='')}")
 
-    async def status(self,container_id):
-        import asyncio
-        def inspect():
-            try:
-                container=self.client.containers.get(container_id); container.reload()
-                state=(container.attrs.get("State") or {}).get("Status","unknown")
-                return "running" if state=="running" else "stopped" if state in {"exited","created","dead"} else "unknown"
-            except Exception: return "unknown"
-        return await asyncio.to_thread(inspect)
+    async def status(self, service_id: str) -> str:
+        try:
+            service = await self._request("GET", f"/services/{quote(service_id, safe='')}")
+            if isinstance(service, dict) and service.get("suspended") == "suspended":
+                return "stopped"
+            deploys = await self._request(
+                "GET", f"/services/{quote(service_id, safe='')}/deploys",
+                params={"limit": 1},
+            )
+        except RenderAPIError as exc:
+            return "unknown" if exc.status_code == 404 else "unknown"
+        if isinstance(deploys, list) and deploys:
+            latest = deploys[0].get("deploy", deploys[0]) if isinstance(deploys[0], dict) else {}
+            state = str(latest.get("status", "")).lower() if isinstance(latest, dict) else ""
+            if state == "live":
+                return "running"
+            if state in {"build_failed", "update_failed", "pre_deploy_failed", "deactivated"}:
+                return "failed"
+            if state in {"canceled", "cancelled"}:
+                return "stopped"
+            if state:
+                return "provisioning"
+        return "provisioning"
+
+    async def ping(self) -> bool:
+        await self._request(
+            "GET", "/services", params={"ownerId": self.workspace_id, "limit": 1}
+        )
+        return True

@@ -316,10 +316,10 @@ async def callback_router(update,context):
         elif action=="health":
             try:
                 context.application.bot_data["db"].require()
-                await asyncio.to_thread(context.application.bot_data["provisioner"].client.ping)
-                body="ᴅᴀᴛᴀʙᴀsᴇ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\nᴅᴏᴄᴋᴇʀ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\nᴍᴀɴᴀɢᴇʀ: ᴏɴʟɪɴᴇ"
+                await context.application.bot_data["provisioner"].ping()
+                body="ᴅᴀᴛᴀʙᴀsᴇ: ᴄᴏɴɴᴇᴄᴛᴇᴅ\nRᴇɴᴅᴇʀ API: ᴄᴏɴɴᴇᴄᴛᴇᴅ\nᴍᴀɴᴀɢᴇʀ: ᴏɴʟɪɴᴇ"
             except Exception:
-                body="ᴅᴀᴛᴀʙᴀsᴇ / ᴅᴏᴄᴋᴇʀ ᴄᴏɴɴᴇᴄᴛɪᴏɴ ᴘʀᴏʙʟᴇᴍ."
+                body="ᴅᴀᴛᴀʙᴀsᴇ / Rᴇɴᴅᴇʀ API ᴄᴏɴɴᴇᴄᴛɪᴏɴ ᴘʀᴏʙʟᴇᴍ."
         else: body="ᴜɴᴋɴᴏᴡɴ sᴛᴀᴛs ᴄᴀᴛᴇɢᴏʀʏ."
         await _send(context,q.message.chat_id,body)
     elif data.startswith("users:"):
@@ -466,22 +466,21 @@ async def diagnostics(update, context):
         results.append(f"PostgreSQL: FAILED ({type(exc).__name__})")
     provisioner = context.application.bot_data["provisioner"]
     try:
-        import asyncio
-        await asyncio.to_thread(provisioner.client.ping)
-        results.append("Docker daemon: OK")
+        await provisioner.ping()
+        results.append("Render API: OK")
     except Exception as exc:
-        results.append(f"Docker daemon: FAILED ({type(exc).__name__})")
-    for product, image in (("File Sharing", provisioner.file_image), ("Link Sharing", provisioner.link_image)):
-        results.append(f"{product} image: configured" if image else f"{product} image: MISSING (set the image environment variable)")
-    try:
-        provisioner.secret_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        probe = provisioner.secret_root / ".write-test"
-        probe.write_text("ok", encoding="utf-8")
-        probe.unlink(missing_ok=True)
-        results.append(f"Clone secret directory: writable ({provisioner.secret_root})")
-    except Exception as exc:
-        results.append(f"Clone secret directory: FAILED ({type(exc).__name__}; set CLONE_SECRET_DIR to a writable host path)")
-    results.append("Docker host note: clone containers and mounted secret files must use the same Docker host filesystem.")
+        results.append(f"Render API: FAILED ({type(exc).__name__})")
+    checks = (
+        ("Render workspace", provisioner.workspace_id),
+        ("Private GHCR registry credential", provisioner.registry_credential_id),
+        ("File Sharing repository", provisioner.file_repo),
+        ("File Sharing image", provisioner.file_image),
+        ("Link Sharing repository", provisioner.link_repo),
+        ("Link Sharing image", provisioner.link_image),
+    )
+    for label, value in checks:
+        results.append(f"{label}: configured" if value else f"{label}: MISSING")
+    results.append("Generated bots are created as Render Background Workers; their plan may incur charges.")
     await _send(update, context, "**ᴄʟᴏɴᴇ ᴍᴀɴᴀɢᴇʀ ᴅɪᴀɢɴᴏsᴛɪᴄs**\n\n" + "\n".join(results))
 
 

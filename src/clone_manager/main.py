@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -8,7 +9,7 @@ from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CallbackQue
 from .config import Settings
 from .database import Database
 from .defaults import DEFAULT_MESSAGES
-from .provisioner import DockerProvisioner
+from .provisioner import RenderProvisioner
 from .handlers.clones import add_clone_handlers
 from .message_editor.handlers import add_editor_handlers
 from .admin import add_admin_handlers, command_access_gate
@@ -60,7 +61,7 @@ async def post_init(app):
         BotCommand("stats", "View manager statistics"),
         BotCommand("logs", "View activity and error logs"),
         BotCommand("ping", "Check bot response"),
-        BotCommand("diagnostics", "Check Telegram, database and Docker host"),
+        BotCommand("diagnostics", "Check Telegram, PostgreSQL and Render API"),
         BotCommand("fsubs", "Manage force-subscription channels and message"),
         BotCommand("restart", "Restart or stop the manager"),
         BotCommand("maintenance", "Open maintenance controls"),
@@ -168,7 +169,7 @@ def main():
     app.bot_data.update({"settings":settings,"owner_id":owner_id,"admins":admin_ids,"clone_id":settings.clone_id,
         "image_url":settings.branding_image_url,"image_path":settings.branding_image_path,
         "small_caps":settings.small_caps,"defaults":DEFAULT_MESSAGES,"allowed_users":allowed,
-        "encryption_key":encryption_key,"provisioner":DockerProvisioner()})
+        "encryption_key":encryption_key,"provisioner":RenderProvisioner()}})
     app.add_handler(MessageHandler(filters.ALL, message_fsubs_gate), group=-110)
     app.add_handler(CallbackQueryHandler(callback_fsubs_gate), group=-11)
     app.add_handler(CallbackQueryHandler(close_branded_message,pattern=r"^branding:close$"),group=-10)
