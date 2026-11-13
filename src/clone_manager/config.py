@@ -45,13 +45,15 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        token = value("BOT_TOKEN")
-        dsn = value("DATABASE_URL")
+        token = str(value("BOT_TOKEN") or "").strip()
+        dsn = str(value("DATABASE_URL") or "").strip()
         owner = value("OWNER_ID", "0")
         if not token:
             raise RuntimeError("BOT_TOKEN is required (or provide CONFIG_FILE).")
         if not dsn:
-            raise RuntimeError("DATABASE_URL is required.")
+            raise RuntimeError("DATABASE_URL is missing or blank. Set it to your PostgreSQL connection string in the Render service Environment settings.")
+        if not dsn.startswith(("postgresql://", "postgres://")):
+            raise RuntimeError("DATABASE_URL must start with postgresql:// or postgres://. Do not use a MongoDB URI or a postgresql+asyncpg:// URL.")
         try:
             owner_id = int(owner)
         except (TypeError, ValueError) as exc:
@@ -59,7 +61,7 @@ class Settings:
         storage_channel = value("STORAGE_CHANNEL_ID")
         return cls(
             bot_token=str(token),
-            database_url=str(dsn),
+            database_url=dsn,
             owner_id=owner_id,
             clone_id=str(value("CLONE_ID", "official")),
             branding_image_url=str(value("BRANDING_IMAGE_URL", BRANDING_IMAGE_DEFAULT)),
