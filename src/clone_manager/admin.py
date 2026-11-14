@@ -288,7 +288,41 @@ async def callback_router(update,context):
         elif key=="channel":
             body="(Quote start)\n╭───────────────⍟\n├➽ Dᴇᴠᴇʟᴏᴩᴇʀ : @Just_astha\n├➽ Oᴡɴᴇʀ : @Just_astha\n├➽ Aɴɪᴍᴇ Iɴᴅᴇx : @Master_Index\n├➽ Fɪɴɪsʜᴇᴅ Aɴɪᴍᴇ : @anime_portals\n├➽ Oɴɢᴏɪɴɢ Aɴɪᴍᴇ : @ongoing_portals\n├➽ Mᴀɴʜᴡᴀ / Mᴀɴɢᴀ: @Manga_Portals\n├➽ Nᴇᴛᴡᴏʀᴋ : @Anime_Gateway\n├➽ Rᴇǫ/Cʜᴀᴛ : https://t.me/+lB05vD5bGyszMzg1\n╰───────────────⍟\n(Quote end)"
             await _send(context,q.message.chat_id,body)
-        else: await _send(context,q.message.chat_id,f"{key.title()} settings",_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
+        elif key=="botinfo":
+            me=await context.bot.get_me()
+            body=f"**ᴍᴀɴᴀɢᴇʀ ɪɴғᴏʀᴍᴀᴛɪᴏɴ**\\n\\nName: {me.first_name}\\nUsername: @{me.username or 'not set'}\\nRuntime: Render Web Service\\nDatabase: PostgreSQL"
+            markup=_markup([
+                [("· ᴀʙᴏᴜᴛ ·","admin:about"),("· ᴄᴏᴍᴍᴀɴᴅs ·","admin:commands")],
+                [("· ᴅɪᴀɢɴᴏsᴛɪᴄs ·","admin:diagnostics"),("· ʙᴀᴄᴋ ·","admin:back")],
+            ])
+            await _send(context,q.message.chat_id,body,markup)
+        elif key=="messages":
+            from .message_editor.handlers import texts as show_texts
+            await show_texts(update,context)
+        elif key=="branding":
+            await _send(context,q.message.chat_id,"**ʙʀᴀɴᴅɪɴɢ & ᴍᴇssᴀɢᴇ sᴛʏʟᴇ**\\n\\nChoose the setting you want to edit.",_markup([
+                [("· ɪᴍᴀɢᴇ ·","admin:edit:setimage"),("· ғᴏᴏᴛᴇʀ ·","admin:edit:setfooter")],
+                [("· ʙᴏᴛ ɴᴀᴍᴇ ·","admin:edit:setname"),("· ǫᴜᴏᴛᴇ sᴛʏʟᴇ ·","admin:edit:setquote")],
+                [("· ʙᴀᴄᴋ ·","admin:back")],
+            ]))
+        elif key=="buttons":
+            await _edit_command(update,context,"setbuttons")
+        elif key=="access":
+            from .fsubs import fsubs_command
+            await fsubs_command(update,context)
+        elif key=="logs":
+            await logs(update,context)
+        elif key=="diagnostics":
+            await diagnostics(update,context)
+        elif key=="edit":
+            parts=data.split(":")
+            command=parts[2] if len(parts)==3 else ""
+            if command in EDITABLE:
+                await _edit_command(update,context,command)
+            else:
+                await _send(context,q.message.chat_id,"Unknown branding setting.",_markup([[("· ʙᴀᴄᴋ ·","admin:branding")]]))
+        else:
+            await _send(context,q.message.chat_id,"This settings section is not available.",_markup([[("· ʙᴀᴄᴋ ·","admin:back")]]))
     elif data.startswith("maintenance:"):
         action=data.split(":")[1]; db=context.application.bot_data["db"]
         if action in {"on","off"}:
