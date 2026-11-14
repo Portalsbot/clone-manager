@@ -290,7 +290,7 @@ async def callback_router(update,context):
             await _send(context,q.message.chat_id,body)
         elif key=="botinfo":
             me=await context.bot.get_me()
-            body=f"**ᴍᴀɴᴀɢᴇʀ ɪɴғᴏʀᴍᴀᴛɪᴏɴ**\\n\\nName: {me.first_name}\\nUsername: @{me.username or 'not set'}\\nRuntime: Render Web Service\\nDatabase: PostgreSQL"
+            body=f"**ᴍᴀɴᴀɢᴇʀ ɪɴғᴏʀᴍᴀᴛɪᴏɴ**\n\nName: {me.first_name}\nUsername: @{me.username or 'not set'}\nRuntime: Bot Manager\nDatabase: PostgreSQL"
             markup=_markup([
                 [("· ᴀʙᴏᴜᴛ ·","admin:about"),("· ᴄᴏᴍᴍᴀɴᴅs ·","admin:commands")],
                 [("· ᴅɪᴀɢɴᴏsᴛɪᴄs ·","admin:diagnostics"),("· ʙᴀᴄᴋ ·","admin:back")],
@@ -300,7 +300,7 @@ async def callback_router(update,context):
             from .message_editor.handlers import texts as show_texts
             await show_texts(update,context)
         elif key=="branding":
-            await _send(context,q.message.chat_id,"**ʙʀᴀɴᴅɪɴɢ & ᴍᴇssᴀɢᴇ sᴛʏʟᴇ**\\n\\nChoose the setting you want to edit.",_markup([
+            await _send(context,q.message.chat_id,"**ʙʀᴀɴᴅɪɴɢ & ᴍᴇssᴀɢᴇ sᴛʏʟᴇ**\n\nChoose the setting you want to edit.",_markup([
                 [("· ɪᴍᴀɢᴇ ·","admin:edit:setimage"),("· ғᴏᴏᴛᴇʀ ·","admin:edit:setfooter")],
                 [("· ʙᴏᴛ ɴᴀᴍᴇ ·","admin:edit:setname"),("· ǫᴜᴏᴛᴇ sᴛʏʟᴇ ·","admin:edit:setquote")],
                 [("· ʙᴀᴄᴋ ·","admin:back")],
