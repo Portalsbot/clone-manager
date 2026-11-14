@@ -232,7 +232,7 @@ async def clones_filter_callback(update,context):
     offset=min((offset//page_size)*page_size,last_offset)
     page_rows=rows[offset:offset+page_size]
     title={"all":"ᴀʟʟ ᴄʟᴏɴᴇs","running":"ʀᴜɴɴɪɴɢ ᴄʟᴏɴᴇs","stopped":"sᴛᴏᴘᴘᴇᴅ ᴄʟᴏɴᴇs","recent":"ʀᴇᴄᴇɴᴛ ᴄʟᴏɴᴇs","file":"ꜰɪʟᴇ sʜᴀʀɪɴɢ ʙᴏᴛs","link":"ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛs"}.get(filter_key,"ᴀʟʟ ᴄʟᴏɴᴇs")
-    body=(f"(Quote start) {title}\\nᴛᴏᴛᴀʟ: {total} · 🟢 ʀᴜɴɴɪɴɢ: {running} · 🔴 sᴛᴏᴘᴘᴇᴅ: {stopped}\\n"
+    body=(f"(Quote start) {title}\nᴛᴏᴛᴀʟ: {total} · 🟢 ʀᴜɴɴɪɴɢ: {running} · 🔴 sᴛᴏᴘᴘᴇᴅ: {stopped}\n"
           f"ᴘᴀɢᴇ: {offset//page_size+1}/{max(1,(total+page_size-1)//page_size)} (Quote end)")
     buttons=[]
     for row in page_rows:
@@ -251,7 +251,7 @@ async def clones_filter_callback(update,context):
         [InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")],
     ])
     if not page_rows:
-        body += "\\n\\nɴᴏ ᴄʟᴏɴᴇs ᴡᴇʀᴇ ғᴏᴜɴᴅ ɪɴ ᴛʜɪs ᴄᴀᴛᴇɢᴏʀʏ."
+        body += "\n\nɴᴏ ᴄʟᴏɴᴇs ᴡᴇʀᴇ ғᴏᴜɴᴅ ɪɴ ᴛʜɪs ᴄᴀᴛᴇɢᴏʀʏ."
     await _send(update,context,body,InlineKeyboardMarkup(keyboard))
 
 
@@ -268,7 +268,7 @@ async def clone_detail_callback(update,context):
     icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
     body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\n\nɴᴀᴍᴇ: @{row['bot_username']}\nɪᴅ: {row['clone_id']}\nᴛʏᴘᴇ: {row['product']}\nsᴛᴀᴛᴜs: {icon} {row['status']}\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\nʙᴏᴛ ɪᴅ: {row['bot_id']}\nʀᴇɴᴅᴇʀ sᴇʀᴠɪᴄᴇ: {row['render_service_id'] or 'not assigned'}\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
     state_action="stop" if row["status"]=="running" else "restart"
-    state_label="ᴘᴀᴜsᴇ" if row["status"]=="running" else "ʀᴇsᴜᴍᴇ"
+    state_label="ᴘᴀᴜsᴇ" if row["status"]=="running" else "ʀᴇsᴜᴍᴇ" if row["status"]=="stopped" else "ʀᴇsᴛᴀʀᴛ"
     markup=InlineKeyboardMarkup([
         [InlineKeyboardButton(f"· {state_label} ·",callback_data=f"clone:{state_action}:{clone_id}")],
         [InlineKeyboardButton("· ᴏᴘᴇɴ ʙᴏᴛ ·",url=f"https://t.me/{row['bot_username']}"),
