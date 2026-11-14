@@ -267,8 +267,10 @@ async def clone_detail_callback(update,context):
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
     icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
     body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\n\nɴᴀᴍᴇ: @{row['bot_username']}\nɪᴅ: {row['clone_id']}\nᴛʏᴘᴇ: {row['product']}\nsᴛᴀᴛᴜs: {icon} {row['status']}\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\nʙᴏᴛ ɪᴅ: {row['bot_id']}\nʀᴇɴᴅᴇʀ sᴇʀᴠɪᴄᴇ: {row['render_service_id'] or 'not assigned'}\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
+    state_action="stop" if row["status"]=="running" else "restart"
+    state_label="ᴘᴀᴜsᴇ" if row["status"]=="running" else "ʀᴇsᴜᴍᴇ"
     markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("· sᴛᴏᴘ ·",callback_data=f"clone:stop:{clone_id}"),InlineKeyboardButton("· ʀᴇsᴛᴀʀᴛ ·",callback_data=f"clone:restart:{clone_id}")],
+        [InlineKeyboardButton(f"· {state_label} ·",callback_data=f"clone:{state_action}:{clone_id}")],
         [InlineKeyboardButton("· ᴏᴘᴇɴ ʙᴏᴛ ·",url=f"https://t.me/{row['bot_username']}"),
          InlineKeyboardButton("· ᴅᴇʟᴇᴛᴇ ·",callback_data=f"clone:delete:{clone_id}")],
         [InlineKeyboardButton("· ᴇᴅɪᴛ ᴄᴏɴғɪɢ ·",callback_data=f"clone:edit:{clone_id}"),
@@ -314,9 +316,7 @@ async def clone_manage_callback(update,context):
                         return
             async with db.require().acquire() as conn:
                 async with conn.transaction():
-                    await conn.execute("DELETE FROM bot_message_templates WHERE clone_id=$1",clone_id)
-                    await conn.execute("DELETE FROM bot_message_buttons WHERE clone_id=$1",clone_id)
-                    await conn.execute("DELETE FROM bot_users WHERE clone_id=$1",clone_id)
+                    # Keep the bot's product data and editable templates for possible re-registration.
                     await conn.execute("DELETE FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
             await _send(update,context,f"Clone @{row['bot_username']} was removed from Clone Manager. Product database records were retained.")
             return
