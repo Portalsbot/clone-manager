@@ -32,10 +32,16 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await db.require().execute("""INSERT INTO bot_users(clone_id,user_id) VALUES($1,$2)
         ON CONFLICT(clone_id,user_id) DO UPDATE SET last_seen=NOW()""",clone_id,user_id)
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    markup=InlineKeyboardMarkup([
+    start_rows=[
         [InlineKeyboardButton("· ᴀʙᴏᴜᴛ ·",callback_data="admin:about"),InlineKeyboardButton("· ᴄʜᴀɴɴᴇʟ ·",callback_data="admin:channel")],
         [InlineKeyboardButton("· ᴄᴏᴍᴍᴀɴᴅs ·",callback_data="admin:commands")]
-    ])
+    ]
+    if _allowed(user_id,context):
+        start_rows.append([
+            InlineKeyboardButton("· ᴄʀᴇᴀᴛᴇ ᴄʟᴏɴᴇ ·",callback_data="start:clone"),
+            InlineKeyboardButton("· ᴍʏ ᴄʟᴏɴᴇs ·",callback_data="start:clones"),
+        ])
+    markup=InlineKeyboardMarkup(start_rows)
     saved_buttons=await context.application.bot_data["db"].get_setting("branding.buttons_json","")
     if saved_buttons:
         try:
@@ -46,6 +52,21 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
     default_text=f"(Quote start) ʙᴏᴛ-ʟɪᴠᴇ, HI {update.effective_user.mention_html()} ~ (Quote end)\n\n(Quote start) **Pʀɪᴠᴀᴛᴇ Cloning ʙᴏᴛ: Clone ᴀɴᴅ Mᴀɴᴀɢᴇ ʙᴏᴛs sɪᴍᴘʟʏ, ǫᴜɪᴄᴋʟʏ, ᴀɴᴅ ᴇғғᴏʀᴛʟᴇssʟʏ. (Quote end)"
     body=await context.application.bot_data["db"].get_setting("message.start",default_text)
     await _send(update,context,body,markup)
+
+async def start_menu_callback(update:Update,context:ContextTypes.DEFAULT_TYPE):
+    query=update.callback_query
+    if not query:
+        return
+    if not _allowed(query.from_user.id,context):
+        await query.answer("Owner / Admin only.",show_alert=True)
+        return
+    await query.answer()
+    action=query.data.rsplit(":",1)[-1]
+    if action=="clone":
+        await clone(update,context)
+    elif action=="clones":
+        await clones(update,context)
+
 
 async def clone(update:Update,context:ContextTypes.DEFAULT_TYPE):
     for state in ("pending_clone_edit","pending_clone_product","editing_text_key","editing_clone_id",
@@ -190,25 +211,49 @@ async def clones_filter_callback(update,context):
     if not _allowed(q.from_user.id,context):
         await q.answer("Owner / Admin only.",show_alert=True); return
     await q.answer()
-    action=q.data.split(":",1)[1]
-    filter_key="all" if action=="refresh" else action
-    rows=await _live_clone_rows(context,filter_key)
+    parts=q.data.split(":")
+    if len(parts)>=4 and parts[1]=="page":
+        filter_key=parts[2]
+        try: offset=max(0,int(parts[3]))
+        except ValueError: offset=0
+    else:
+        action=parts[1] if len(parts)>1 else "all"
+        filter_key="all" if action=="refresh" else action
+        offset=0
+    if filter_key not in {"all","running","stopped","recent","file","link"}:
+        filter_key="all"
     all_rows=await _live_clone_rows(context,"all")
+    rows=all_rows if filter_key=="all" else await _live_clone_rows(context,filter_key)
     running=sum(r["status"]=="running" for r in all_rows)
     stopped=sum(r["status"]=="stopped" for r in all_rows)
+    page_size=20
+    total=len(rows)
+    last_offset=((max(total-1,0))//page_size)*page_size
+    offset=min((offset//page_size)*page_size,last_offset)
+    page_rows=rows[offset:offset+page_size]
     title={"all":"ᴀʟʟ ᴄʟᴏɴᴇs","running":"ʀᴜɴɴɪɴɢ ᴄʟᴏɴᴇs","stopped":"sᴛᴏᴘᴘᴇᴅ ᴄʟᴏɴᴇs","recent":"ʀᴇᴄᴇɴᴛ ᴄʟᴏɴᴇs","file":"ꜰɪʟᴇ sʜᴀʀɪɴɢ ʙᴏᴛs","link":"ʟɪɴᴋ sʜᴀʀɪɴɢ ʙᴏᴛs"}.get(filter_key,"ᴀʟʟ ᴄʟᴏɴᴇs")
-    body=f"(Quote start) {title}\\nᴛᴏᴛᴀʟ: {len(all_rows)} · 🟢 ʀᴜɴɴɪɴɢ: {running} · 🔴 sᴛᴏᴘᴘᴇᴅ: {stopped} (Quote end)"
+    body=(f"(Quote start) {title}\\nᴛᴏᴛᴀʟ: {total} · 🟢 ʀᴜɴɴɪɴɢ: {running} · 🔴 sᴛᴏᴘᴘᴇᴅ: {stopped}\\n"
+          f"ᴘᴀɢᴇ: {offset//page_size+1}/{max(1,(total+page_size-1)//page_size)} (Quote end)")
     buttons=[]
-    for row in rows:
+    for row in page_rows:
         icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
         buttons.append(InlineKeyboardButton(f"{icon} @{row['bot_username']}",callback_data=f"clone:detail:{row['clone_id']}"))
     keyboard=[buttons[i:i+2] for i in range(0,len(buttons),2)]
+    navigation=[]
+    if offset>0:
+        navigation.append(InlineKeyboardButton("· ᴘʀᴇᴠ ·",callback_data=f"clones:page:{filter_key}:{offset-page_size}"))
+    if offset+page_size<total:
+        navigation.append(InlineKeyboardButton("· ɴᴇxᴛ ·",callback_data=f"clones:page:{filter_key}:{offset+page_size}"))
+    if navigation: keyboard.append(navigation)
     keyboard.extend([
         [InlineKeyboardButton("· ᴀʟʟ ·",callback_data="clones:all"),InlineKeyboardButton("· ʀᴜɴɴɪɴɢ ·",callback_data="clones:running")],
         [InlineKeyboardButton("· sᴛᴏᴘᴘᴇᴅ ·",callback_data="clones:stopped"),InlineKeyboardButton("· ʀᴇғʀᴇsʜ ·",callback_data="clones:refresh")],
         [InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="admin:back")],
     ])
+    if not page_rows:
+        body += "\\n\\nɴᴏ ᴄʟᴏɴᴇs ᴡᴇʀᴇ ғᴏᴜɴᴅ ɪɴ ᴛʜɪs ᴄᴀᴛᴇɢᴏʀʏ."
     await _send(update,context,body,InlineKeyboardMarkup(keyboard))
+
 
 async def clone_detail_callback(update,context):
     q=update.callback_query
@@ -222,7 +267,13 @@ async def clone_detail_callback(update,context):
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
     icon="🟢" if row["status"]=="running" else "🔴" if row["status"]=="stopped" else "⚪"
     body=f"(Quote start) ᴄʟᴏɴᴇ ɪɴғᴏʀᴍᴀᴛɪᴏɴ ♡ (Quote end)\n\nɴᴀᴍᴇ: @{row['bot_username']}\nɪᴅ: {row['clone_id']}\nᴛʏᴘᴇ: {row['product']}\nsᴛᴀᴛᴜs: {icon} {row['status']}\nᴄʀᴇᴀᴛᴇᴅ: {row['created_at']}\nʙᴏᴛ ɪᴅ: {row['bot_id']}\nʀᴇɴᴅᴇʀ sᴇʀᴠɪᴄᴇ: {row['render_service_id'] or 'not assigned'}\nʟᴀsᴛ ᴇʀʀᴏʀ: {row['error_code'] or 'none'}"
-    markup=InlineKeyboardMarkup([[InlineKeyboardButton("· sᴛᴏᴘ ·",callback_data=f"clone:stop:{clone_id}"),InlineKeyboardButton("· ʀᴇsᴛᴀʀᴛ ·",callback_data=f"clone:restart:{clone_id}")]])
+    markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton("· sᴛᴏᴘ ·",callback_data=f"clone:stop:{clone_id}"),InlineKeyboardButton("· ʀᴇsᴛᴀʀᴛ ·",callback_data=f"clone:restart:{clone_id}")],
+        [InlineKeyboardButton("· ᴏᴘᴇɴ ʙᴏᴛ ·",url=f"https://t.me/{row['bot_username']}"),
+         InlineKeyboardButton("· ᴅᴇʟᴇᴛᴇ ·",callback_data=f"clone:delete:{clone_id}")],
+        [InlineKeyboardButton("· ᴇᴅɪᴛ ᴄᴏɴғɪɢ ·",callback_data=f"clone:edit:{clone_id}"),
+         InlineKeyboardButton("· ʙᴀᴄᴋ ·",callback_data="clones:all")],
+    ])
     await _send(update,context,body,markup)
 
 async def clone_manage_callback(update,context):
@@ -235,6 +286,13 @@ async def clone_manage_callback(update,context):
     row=await db.require().fetchrow("SELECT * FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
     if not row:
         await _send(update,context,"ᴄʟᴏɴᴇ ɴᴏᴛ ғᴏᴜɴᴅ."); return
+    if action=="delete":
+        markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("· ᴄᴏɴғɪʀᴍ ᴅᴇʟᴇᴛᴇ ·",callback_data=f"clone:confirm-delete:{clone_id}"),
+            InlineKeyboardButton("· ᴄᴀɴᴄᴇʟ ·",callback_data=f"clone:detail:{clone_id}"),
+        ]])
+        await _send(update,context,f"(Quote start) Delete @{row['bot_username']} from the manager? This removes its saved manager configuration. Bot data in the product database is retained. (Quote end)",markup)
+        return
     if action in {"stop","restart"}:
         if not row["render_service_id"]:
             await _send(update,context,"ᴛʜɪs ᴄʟᴏɴᴇ ʜᴀs ɴᴏ ᴀᴄᴛɪᴠᴇ ʀᴇɴᴅᴇʀ sᴇʀᴠɪᴄᴇ.")
@@ -244,6 +302,24 @@ async def clone_manage_callback(update,context):
         await _send(update,context,f"(Quote start) ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ {verb} @{row['bot_username']}? (Quote end)",markup)
         return
     if action.startswith("confirm-"):
+        operation=action.split("-",1)[1]
+        if operation=="delete":
+            if row["render_service_id"]:
+                try:
+                    await context.application.bot_data["provisioner"].delete(row["render_service_id"])
+                except Exception as exc:
+                    if getattr(exc,"status_code",None)!=404:
+                        log.exception("Could not delete Render service for clone %s",clone_id)
+                        await _send(update,context,f"Deletion stopped because the hosting service could not be removed ({type(exc).__name__}).")
+                        return
+            async with db.require().acquire() as conn:
+                async with conn.transaction():
+                    await conn.execute("DELETE FROM bot_message_templates WHERE clone_id=$1",clone_id)
+                    await conn.execute("DELETE FROM bot_message_buttons WHERE clone_id=$1",clone_id)
+                    await conn.execute("DELETE FROM bot_users WHERE clone_id=$1",clone_id)
+                    await conn.execute("DELETE FROM clone_instances WHERE clone_id=$1 AND owner_id=$2",clone_id,context.application.bot_data["owner_id"])
+            await _send(update,context,f"Clone @{row['bot_username']} was removed from Clone Manager. Product database records were retained.")
+            return
         if not row["render_service_id"]:
             await _send(update,context,"ᴛʜɪs ᴄʟᴏɴᴇ ʜᴀs ɴᴏ ᴀᴄᴛɪᴠᴇ ʀᴇɴᴅᴇʀ sᴇʀᴠɪᴄᴇ.")
             return
@@ -620,9 +696,10 @@ def add_clone_handlers(app):
     app.add_handler(CommandHandler("restartclone",restartclone))
     app.add_handler(CommandHandler("clonedit",clonedit))
     app.add_handler(CommandHandler("cloneinfo",cloneinfo))
+    app.add_handler(CallbackQueryHandler(start_menu_callback,pattern=r"^start:(clone|clones)$"))
     app.add_handler(CallbackQueryHandler(select_product,pattern=r"^clone:select:(file|link)$"))
-    app.add_handler(CallbackQueryHandler(clones_filter_callback,pattern=r"^clones:(all|running|stopped|recent|file|link|refresh)$"))
+    app.add_handler(CallbackQueryHandler(clones_filter_callback,pattern=r"^clones:(?:(all|running|stopped|recent|file|link|refresh)|page:(all|running|stopped|recent|file|link):[0-9]+)$"))
     app.add_handler(CallbackQueryHandler(clone_detail_callback,pattern=r"^clone:detail:"))
-    app.add_handler(CallbackQueryHandler(clone_manage_callback,pattern=r"^clone:(stop|restart|confirm-stop|confirm-restart):"))
+    app.add_handler(CallbackQueryHandler(clone_manage_callback,pattern=r"^clone:(stop|restart|delete|confirm-stop|confirm-restart|confirm-delete):"))
     app.add_handler(CallbackQueryHandler(clone_edit_callback,pattern=r"^clone:(edit|editkey|editfield|deploy|redeploy):"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,receive_token),group=-2)
